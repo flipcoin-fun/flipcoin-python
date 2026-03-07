@@ -634,7 +634,7 @@ class ClobQuote:
     best_bid_bps: int = 0
     best_ask_bps: int = 0
     spread_bps: int = 0
-    depth_near_mid: str = "0"
+    depth_near_mid: int = 0
 
 
 @dataclass

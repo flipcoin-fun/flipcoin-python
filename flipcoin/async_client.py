@@ -300,12 +300,9 @@ class AsyncFlipCoin:
         data = await self._post(path, json_body=body)
         return _parse(CreateMarketResult, data)
 
-    async def batch_create_markets(
-        self, markets: list[dict], *, auto_sign: bool = True
-    ) -> BatchResult:
+    async def batch_create_markets(self, markets: list[dict]) -> BatchResult:
         body: dict[str, Any] = {"markets": markets}
-        params = "?auto_sign=true" if auto_sign else ""
-        data = await self._post(f"/api/agent/markets/batch{params}", json_body=body)
+        data = await self._post("/api/agent/markets/batch", json_body=body)
         return BatchResult.from_dict(data)
 
     # -----------------------------------------------------------------------
