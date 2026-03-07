@@ -159,28 +159,37 @@ class FeeInfo:
 
 
 @dataclass
+class AgentInfo:
+    """Agent identity returned by the ping endpoint."""
+    name: str = ""
+
+
+@dataclass
 class PingResponse:
     ok: bool = False
-    agent: str = ""
+    agent: Optional[AgentInfo] = None
     rate_limit: Optional[RateLimitInfo] = None
     fees: Optional[FeeInfo] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> PingResponse:
-        agent_val = data.get("agent", "")
+        agent_val = data.get("agent")
+        agent_info: Optional[AgentInfo] = None
         if isinstance(agent_val, dict):
-            agent_val = agent_val.get("name", "")
+            agent_info = _parse(AgentInfo, agent_val)
+        elif isinstance(agent_val, str):
+            agent_info = AgentInfo(name=agent_val)
         return cls(
             ok=data.get("ok", False),
-            agent=agent_val,
+            agent=agent_info,
             rate_limit=RateLimitInfo.from_dict(data.get("rate_limit")),
             fees=FeeInfo.from_dict(data.get("fees")),
         )
 
     @property
     def agent_name(self) -> str:
-        """Alias for backward compat."""
-        return self.agent
+        """Convenience accessor for the agent name string."""
+        return self.agent.name if self.agent else ""
 
 
 # ---------------------------------------------------------------------------
@@ -864,7 +873,9 @@ class OrderListResponse:
 class OrderCancelResponse:
     success: bool = False
     order_hash: Optional[str] = None
-    tx_hash: str = ""
+    tx_hash: Optional[str] = None
+    cancel_all: Optional[bool] = None
+    cancelled_count: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
