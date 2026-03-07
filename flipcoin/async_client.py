@@ -33,6 +33,7 @@ from .models import (
     PortfolioResponse,
     Quote,
     SSEEvent,
+    TradeNonceResponse,
     TradeResult,
     ValidateResult,
     VaultBalanceResponse,
@@ -360,6 +361,11 @@ class AsyncFlipCoin:
         relay_body = {"intentId": intent_id, "auto_sign": True}
         data = await self._post("/api/agent/trade/relay", json_body=relay_body)
         return _parse(TradeResult, data)
+
+    async def get_trade_nonce(self) -> TradeNonceResponse:
+        """Get BackstopRouter nonce for the agent's signer."""
+        data = await self._get("/api/agent/trade/nonce")
+        return _parse(TradeNonceResponse, data)
 
     async def get_approval_status(self) -> ApprovalStatus:
         data = await self._get("/api/agent/trade/approve")
