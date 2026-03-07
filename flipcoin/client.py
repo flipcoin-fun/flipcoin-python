@@ -470,7 +470,7 @@ class FlipCoin:
 
     def cancel_all_orders(self) -> OrderCancelResponse:
         """Cancel all open orders via nonce bump."""
-        data = self._delete("/api/agent/orders/_", params={"cancelAll": "true"})
+        data = self._delete("/api/agent/orders/_all", params={"cancelAll": "true"})
         return _parse(OrderCancelResponse, data) or OrderCancelResponse()
 
     # -----------------------------------------------------------------------

@@ -3,6 +3,7 @@
 from .async_client import AsyncFlipCoin
 from .client import FlipCoin
 from .models import (
+    AgentInfo,
     AgentMarketsListResponse,
     ApprovalDetail,
     ApprovalStatus,
@@ -98,6 +99,7 @@ __all__ = [
     "raw_to_usdc",
     "idempotency_key",
     # Models
+    "AgentInfo",
     "AgentMarketsListResponse",
     "ApprovalDetail",
     "ApprovalStatus",

@@ -434,7 +434,7 @@ class AsyncFlipCoin:
         return _parse(OrderCancelResponse, data) or OrderCancelResponse()
 
     async def cancel_all_orders(self) -> OrderCancelResponse:
-        data = await self._delete("/api/agent/orders/_", params={"cancelAll": "true"})
+        data = await self._delete("/api/agent/orders/_all", params={"cancelAll": "true"})
         return _parse(OrderCancelResponse, data) or OrderCancelResponse()
 
     # -----------------------------------------------------------------------
