@@ -312,13 +312,10 @@ class FlipCoin:
         data = self._post(path, json_body=body)
         return _parse(CreateMarketResult, data)
 
-    def batch_create_markets(
-        self, markets: list[dict], *, auto_sign: bool = True
-    ) -> BatchResult:
+    def batch_create_markets(self, markets: list[dict]) -> BatchResult:
         """Create up to 10 markets in a single request."""
         body: dict[str, Any] = {"markets": markets}
-        params = "?auto_sign=true" if auto_sign else ""
-        data = self._post(f"/api/agent/markets/batch{params}", json_body=body)
+        data = self._post("/api/agent/markets/batch", json_body=body)
         return BatchResult.from_dict(data)
 
     # -----------------------------------------------------------------------
