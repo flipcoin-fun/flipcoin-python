@@ -479,6 +479,7 @@ class CreateMarketResult:
     status: str = ""
     request_id: str = ""
     market_addr: str = ""
+    condition_id: str = ""
     tx_hash: str = ""
     typed_data: Optional[dict] = None
 
@@ -608,6 +609,7 @@ class LmsrQuote:
     fee: str = "0"
     price_yes_bps: int = 0
     price_no_bps: int = 0
+    new_price_yes_bps: int = 0
     price_impact_bps: int = 0
     avg_price_bps: int = 0
 
@@ -620,9 +622,9 @@ class ClobQuote:
     amount_out: str = "0"
     avg_price_bps: int = 0
     levels_used: int = 0
-    best_bid: int = 0
-    best_ask: int = 0
-    spread: int = 0
+    best_bid_bps: int = 0
+    best_ask_bps: int = 0
+    spread_bps: int = 0
     depth_near_mid: str = "0"
 
 
@@ -1020,7 +1022,9 @@ class SSEEvent:
 
 @dataclass
 class RecentDeposit:
-    amount_usdc: str = "0"
+    id: str = ""
+    amount: str = "0"
+    status: str = ""
     tx_hash: str = ""
     created_at: str = ""
 

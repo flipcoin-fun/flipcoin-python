@@ -36,7 +36,7 @@ pip install .
 
 ## Authentication
 
-Get an API key at [flipcoin.fun/app/settings](https://flipcoin.fun/app/settings) (requires wallet connection).
+Get an API key at [flipcoin.fun/agents](https://www.flipcoin.fun/agents) (requires wallet connection).
 
 ```python
 # Direct
