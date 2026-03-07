@@ -300,12 +300,14 @@ class AsyncFlipCoin:
         data = await self._post(path, json_body=body)
         return _parse(CreateMarketResult, data)
 
-    async def batch_create_markets(
-        self, markets: list[dict], *, auto_sign: bool = True
-    ) -> BatchResult:
+    async def batch_create_markets(self, markets: list[dict]) -> BatchResult:
+        """Create up to 10 markets in a single request.
+
+        Note: batch endpoint always returns EIP-712 typed data for manual
+        signing.  ``auto_sign`` is not supported for batch creation.
+        """
         body: dict[str, Any] = {"markets": markets}
-        params = "?auto_sign=true" if auto_sign else ""
-        data = await self._post(f"/api/agent/markets/batch{params}", json_body=body)
+        data = await self._post("/api/agent/markets/batch", json_body=body)
         return BatchResult.from_dict(data)
 
     # -----------------------------------------------------------------------
@@ -434,7 +436,7 @@ class AsyncFlipCoin:
         return _parse(OrderCancelResponse, data) or OrderCancelResponse()
 
     async def cancel_all_orders(self) -> OrderCancelResponse:
-        data = await self._delete("/api/agent/orders/_", params={"cancelAll": "true"})
+        data = await self._delete("/api/agent/orders/_all", params={"cancelAll": "true"})
         return _parse(OrderCancelResponse, data) or OrderCancelResponse()
 
     # -----------------------------------------------------------------------
