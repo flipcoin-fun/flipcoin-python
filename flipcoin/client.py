@@ -1,4 +1,4 @@
-"""Synchronous FlipCoin client."""
+"""Synchronous FlipCoin client — aligned with OpenAPI spec (2026-03-04)."""
 
 from __future__ import annotations
 
@@ -8,30 +8,35 @@ from typing import Any, Generator, Optional
 import httpx
 
 from .models import (
+    AgentMarketsListResponse,
     ApprovalStatus,
+    AuditLogResponse,
     BatchResult,
     ConfigResponse,
     CreateMarketResult,
-    DepositInfo,
     DepositResult,
     ExploreResponse,
     FeedResponse,
     FlipCoinError,
+    LeaderboardResponse,
     Market,
+    MarketDetailsResponse,
     MarketHistoryResponse,
     MarketState,
     Order,
+    OrderCancelResponse,
+    OrderListResponse,
     OrderResult,
     PerformanceResponse,
     PingResponse,
-    Position,
+    PortfolioResponse,
     Quote,
     SSEEvent,
     TradeResult,
     ValidateResult,
+    VaultBalanceResponse,
     Webhook,
     WebhookCreateResult,
-    AuditLogResponse,
     _parse,
     _parse_list,
 )
@@ -50,7 +55,7 @@ class FlipCoin:
 
         client = FlipCoin(api_key="fc_...")
         me = client.ping()
-        print(me.agent_name)
+        print(me.agent)
 
     Or as a context manager::
 
@@ -99,7 +104,7 @@ class FlipCoin:
         raise FlipCoinError(
             body.get("error", response.text),
             status_code=response.status_code,
-            code=body.get("code", "UNKNOWN"),
+            error_code=body.get("errorCode", "UNKNOWN"),
             details=body.get("details"),
         )
 
@@ -133,12 +138,12 @@ class FlipCoin:
     # -----------------------------------------------------------------------
 
     def ping(self) -> PingResponse:
-        """Check connectivity and return agent info."""
+        """Check connectivity and return agent info + rate limits."""
         data = self._get("/api/agent/ping")
         return PingResponse.from_dict(data)
 
     def get_config(self) -> ConfigResponse:
-        """Get platform configuration (contracts, fees, limits)."""
+        """Get platform configuration (contracts, fees, limits, capabilities)."""
         data = self._get("/api/agent/config")
         return ConfigResponse.from_dict(data)
 
@@ -152,10 +157,16 @@ class FlipCoin:
         status: str | None = None,
         sort: str | None = None,
         search: str | None = None,
+        fingerprint: str | None = None,
+        created_by_agent: str | None = None,
+        creator_addr: str | None = None,
+        min_volume: float | None = None,
+        resolve_end_before: str | None = None,
+        resolve_end_after: str | None = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> ExploreResponse:
-        """List markets with optional filters."""
+        """Browse all platform markets with filters (exploreMarkets)."""
         params: dict[str, Any] = {}
         if status:
             params["status"] = status
@@ -163,6 +174,18 @@ class FlipCoin:
             params["sort"] = sort
         if search:
             params["search"] = search
+        if fingerprint:
+            params["fingerprint"] = fingerprint
+        if created_by_agent:
+            params["createdByAgent"] = created_by_agent
+        if creator_addr:
+            params["creatorAddr"] = creator_addr
+        if min_volume is not None:
+            params["minVolume"] = min_volume
+        if resolve_end_before:
+            params["resolveEndBefore"] = resolve_end_before
+        if resolve_end_after:
+            params["resolveEndAfter"] = resolve_end_after
         if limit is not None:
             params["limit"] = limit
         if offset is not None:
@@ -170,14 +193,18 @@ class FlipCoin:
         data = self._get("/api/agent/markets/explore", params=params)
         return ExploreResponse.from_dict(data)
 
-    def get_market(self, address: str) -> Market:
-        """Get a single market by address."""
+    def get_my_markets(self) -> AgentMarketsListResponse:
+        """List agent's own markets and pending requests (listAgentMarkets)."""
+        data = self._get("/api/agent/markets")
+        return AgentMarketsListResponse.from_dict(data)
+
+    def get_market(self, address: str) -> MarketDetailsResponse:
+        """Get full market details with recent trades and stats."""
         data = self._get(f"/api/agent/markets/{address}")
-        market_data = data.get("market", data)
-        return _parse(Market, market_data)
+        return MarketDetailsResponse.from_dict(data)
 
     def get_market_state(self, address: str) -> MarketState:
-        """Get detailed LMSR state and analytics for a market."""
+        """Get LMSR state with analytics and slippage curve."""
         data = self._get(f"/api/agent/markets/{address}/state")
         return MarketState.from_dict(data)
 
@@ -185,21 +212,24 @@ class FlipCoin:
         self,
         address: str,
         *,
-        mode: str | None = None,
-        resolution: str | None = None,
-        from_ts: int | None = None,
-        to_ts: int | None = None,
+        interval: str | None = None,
+        from_ts: str | None = None,
+        to_ts: str | None = None,
+        include_volume: bool | None = None,
+        limit: int | None = None,
     ) -> MarketHistoryResponse:
-        """Get price history for a market."""
+        """Get price history (raw trade points or OHLC candles)."""
         params: dict[str, Any] = {}
-        if mode:
-            params["mode"] = mode
-        if resolution:
-            params["resolution"] = resolution
+        if interval:
+            params["interval"] = interval
         if from_ts is not None:
             params["from"] = from_ts
         if to_ts is not None:
             params["to"] = to_ts
+        if include_volume is not None:
+            params["includeVolume"] = "true" if include_volume else "false"
+        if limit is not None:
+            params["limit"] = limit
         data = self._get(f"/api/agent/markets/{address}/history", params=params)
         return MarketHistoryResponse.from_dict(data)
 
@@ -207,27 +237,31 @@ class FlipCoin:
         self,
         *,
         title: str,
-        resolution_criteria: str = "",
-        resolution_source: str = "",
+        resolution_criteria: str,
+        resolution_source: str,
         description: str = "",
         category: str = "",
-        resolution_date: int | None = None,
-        resolve_end_at: int | None = None,
+        resolution_date: str | None = None,
+        resolve_start_at: str | None = None,
+        resolve_end_at: str | None = None,
         initial_price_yes_bps: int = 5000,
         liquidity_tier: str = "trial",
+        image_url: str | None = None,
         metadata: dict | None = None,
     ) -> ValidateResult:
         """Validate market parameters before creation."""
-        body = self._build_market_body(
+        body = _build_market_body(
             title=title,
             resolution_criteria=resolution_criteria,
             resolution_source=resolution_source,
             description=description,
             category=category,
             resolution_date=resolution_date,
+            resolve_start_at=resolve_start_at,
             resolve_end_at=resolve_end_at,
             initial_price_yes_bps=initial_price_yes_bps,
             liquidity_tier=liquidity_tier,
+            image_url=image_url,
             metadata=metadata,
         )
         data = self._post("/api/agent/markets/validate", json_body=body)
@@ -237,47 +271,58 @@ class FlipCoin:
         self,
         *,
         title: str,
-        resolution_criteria: str = "",
-        resolution_source: str = "",
+        resolution_criteria: str,
+        resolution_source: str,
         description: str = "",
         category: str = "",
-        resolution_date: int | None = None,
-        resolve_end_at: int | None = None,
+        resolution_date: str | None = None,
+        resolve_start_at: str | None = None,
+        resolve_end_at: str | None = None,
         initial_price_yes_bps: int = 5000,
-        initial_probability_bps: int | None = None,
         liquidity_tier: str = "trial",
+        image_url: str | None = None,
         metadata: dict | None = None,
         auto_sign: bool = True,
         dry_run: bool = False,
     ) -> CreateMarketResult:
         """Create a new prediction market."""
-        body = self._build_market_body(
+        body = _build_market_body(
             title=title,
             resolution_criteria=resolution_criteria,
             resolution_source=resolution_source,
             description=description,
             category=category,
             resolution_date=resolution_date,
+            resolve_start_at=resolve_start_at,
             resolve_end_at=resolve_end_at,
-            initial_price_yes_bps=initial_probability_bps or initial_price_yes_bps,
+            initial_price_yes_bps=initial_price_yes_bps,
             liquidity_tier=liquidity_tier,
+            image_url=image_url,
             metadata=metadata,
         )
-        body["auto_sign"] = auto_sign
-        body["dry_run"] = dry_run
-        data = self._post("/api/agent/markets", json_body=body)
+        params: dict[str, str] = {}
+        if auto_sign:
+            params["auto_sign"] = "true"
+        if dry_run:
+            params["dry_run"] = "true"
+        path = "/api/agent/markets"
+        if params:
+            qs = "&".join(f"{k}={v}" for k, v in params.items())
+            path = f"{path}?{qs}"
+        data = self._post(path, json_body=body)
         return _parse(CreateMarketResult, data)
 
     def batch_create_markets(
         self, markets: list[dict], *, auto_sign: bool = True
     ) -> BatchResult:
-        """Create multiple markets in a single request."""
-        body = {"markets": markets, "auto_sign": auto_sign}
-        data = self._post("/api/agent/markets/batch", json_body=body)
+        """Create up to 10 markets in a single request."""
+        body: dict[str, Any] = {"markets": markets}
+        params = "?auto_sign=true" if auto_sign else ""
+        data = self._post(f"/api/agent/markets/batch{params}", json_body=body)
         return BatchResult.from_dict(data)
 
     # -----------------------------------------------------------------------
-    # Trading (LMSR AMM)
+    # Trading (LMSR AMM via BackstopRouter)
     # -----------------------------------------------------------------------
 
     def get_quote(
@@ -285,9 +330,16 @@ class FlipCoin:
         condition_id: str,
         side: str,
         action: str,
-        amount: float,
+        amount: str,
     ) -> Quote:
-        """Get a price quote for a trade."""
+        """Get a price quote with LMSR + CLOB smart routing.
+
+        Args:
+            condition_id: Market condition ID (0x...).
+            side: "yes" or "no".
+            action: "buy" or "sell".
+            amount: Number of shares as bigint string (6 decimals).
+        """
         params = {
             "conditionId": condition_id,
             "side": side,
@@ -295,41 +347,60 @@ class FlipCoin:
             "amount": str(amount),
         }
         data = self._get("/api/quote", params=params)
-        return _parse(Quote, data)
+        return Quote.from_dict(data)
 
     def trade(
         self,
         *,
         condition_id: str,
         side: str,
-        amount: float,
         action: str = "buy",
-        slippage_bps: int | None = None,
+        usdc_amount: str | None = None,
+        shares_amount: str | None = None,
+        max_slippage_bps: int | None = None,
+        max_fee_bps: int | None = None,
+        venue: str = "auto",
     ) -> TradeResult:
-        """Execute a trade (two-step: intent + relay)."""
+        """Execute a trade (two-step: intent + relay with auto_sign).
+
+        For buys, provide ``usdc_amount`` (USDC in base units, 6 decimals).
+        For sells, provide ``shares_amount`` (shares in base units, 6 decimals).
+        """
         intent_body: dict[str, Any] = {
             "conditionId": condition_id,
             "side": side,
             "action": action,
-            "amount": amount,
         }
-        if slippage_bps is not None:
-            intent_body["slippageBps"] = slippage_bps
+        if usdc_amount is not None:
+            intent_body["usdcAmount"] = str(usdc_amount)
+        if shares_amount is not None:
+            intent_body["sharesAmount"] = str(shares_amount)
+        if max_slippage_bps is not None:
+            intent_body["maxSlippageBps"] = max_slippage_bps
+        if max_fee_bps is not None:
+            intent_body["maxFeeBps"] = max_fee_bps
+        if venue != "auto":
+            intent_body["venue"] = venue
 
         intent = self._post_raw("/api/agent/trade/intent", json_body=intent_body)
-        relay_body = {**intent, "auto_sign": True}
+        intent_id = intent.get("intentId", "")
+        relay_body = {"intentId": intent_id, "auto_sign": True}
         data = self._post("/api/agent/trade/relay", json_body=relay_body)
         return _parse(TradeResult, data)
 
-    def get_approval_status(self, condition_id: str) -> ApprovalStatus:
-        """Check token approval status for trading."""
-        data = self._get(
-            "/api/agent/trade/approve", params={"conditionId": condition_id}
-        )
+    def get_trade_nonce(self) -> TradeNonceResponse:
+        """Get BackstopRouter nonce for the agent's signer."""
+        from .models import TradeNonceResponse
+        data = self._get("/api/agent/trade/nonce")
+        return _parse(TradeNonceResponse, data)
+
+    def get_approval_status(self) -> ApprovalStatus:
+        """Check ShareToken ERC-1155 approval for BackstopRouter + Exchange."""
+        data = self._get("/api/agent/trade/approve")
         return ApprovalStatus.from_dict(data)
 
     # -----------------------------------------------------------------------
-    # CLOB orders
+    # CLOB orders (Exchange)
     # -----------------------------------------------------------------------
 
     def create_order(
@@ -337,60 +408,102 @@ class FlipCoin:
         *,
         condition_id: str,
         side: str,
+        action: str = "buy",
         price_bps: int,
-        shares: float,
+        amount: str,
         time_in_force: str = "GTC",
+        expiration_seconds: int | None = None,
+        max_fee_bps: int | None = None,
     ) -> OrderResult:
-        """Place a limit order on the CLOB (two-step: intent + relay)."""
-        intent_body = {
+        """Place a limit order on the CLOB (two-step: intent + relay).
+
+        Args:
+            amount: Number of shares as bigint string (6 decimals).
+        """
+        intent_body: dict[str, Any] = {
             "conditionId": condition_id,
             "side": side,
+            "action": action,
             "priceBps": price_bps,
-            "shares": shares,
+            "amount": str(amount),
             "timeInForce": time_in_force,
         }
+        if expiration_seconds is not None:
+            intent_body["expirationSeconds"] = expiration_seconds
+        if max_fee_bps is not None:
+            intent_body["maxFeeBps"] = max_fee_bps
+
         intent = self._post_raw("/api/agent/orders/intent", json_body=intent_body)
-        relay_body = {**intent, "auto_sign": True}
+        intent_id = intent.get("intentId", "")
+        relay_body = {"intentId": intent_id, "auto_sign": True}
         data = self._post("/api/agent/orders/relay", json_body=relay_body)
         return OrderResult.from_dict(data)
 
-    def get_orders(self, status: str | None = None) -> list[Order]:
-        """List orders, optionally filtered by status."""
-        params = {}
+    def get_orders(
+        self,
+        *,
+        status: str | None = None,
+        condition_id: str | None = None,
+        side: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> OrderListResponse:
+        """List CLOB orders with optional filters."""
+        params: dict[str, Any] = {}
         if status:
             params["status"] = status
+        if condition_id:
+            params["conditionId"] = condition_id
+        if side:
+            params["side"] = side
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
         data = self._get("/api/agent/orders", params=params)
-        return _parse_list(Order, data.get("orders", []))
+        return OrderListResponse.from_dict(data)
 
-    def cancel_order(self, order_hash: str) -> None:
+    def cancel_order(self, order_hash: str) -> OrderCancelResponse:
         """Cancel a single order by hash."""
-        self._delete(f"/api/agent/orders/{order_hash}")
+        data = self._delete(f"/api/agent/orders/{order_hash}")
+        return _parse(OrderCancelResponse, data) or OrderCancelResponse()
 
-    def cancel_all_orders(self) -> None:
-        """Cancel all open orders."""
-        self._delete("/api/agent/orders/all", params={"cancelAll": "true"})
+    def cancel_all_orders(self) -> OrderCancelResponse:
+        """Cancel all open orders via nonce bump."""
+        data = self._delete("/api/agent/orders/_", params={"cancelAll": "true"})
+        return _parse(OrderCancelResponse, data) or OrderCancelResponse()
 
     # -----------------------------------------------------------------------
     # Portfolio
     # -----------------------------------------------------------------------
 
-    def get_portfolio(self, status: str | None = None) -> list[Position]:
-        """Get positions, optionally filtered by status (open/closed/all)."""
+    def get_portfolio(self, status: str | None = None) -> PortfolioResponse:
+        """Get positions with P&L estimates."""
         params = {}
         if status:
             params["status"] = status
         data = self._get("/api/agent/portfolio", params=params)
-        return _parse_list(Position, data.get("positions", []))
+        return PortfolioResponse.from_dict(data)
 
     # -----------------------------------------------------------------------
-    # Analytics
+    # Analytics & Observability
     # -----------------------------------------------------------------------
 
-    def get_performance(self, period: str | None = None) -> PerformanceResponse:
-        """Get agent performance analytics."""
-        params = {}
+    def get_performance(
+        self,
+        *,
+        period: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> PerformanceResponse:
+        """Get creator performance metrics."""
+        params: dict[str, Any] = {}
         if period:
             params["period"] = period
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
         data = self._get("/api/agent/performance", params=params)
         return PerformanceResponse.from_dict(data)
 
@@ -399,59 +512,75 @@ class FlipCoin:
         *,
         limit: int | None = None,
         offset: int | None = None,
-        action: str | None = None,
+        event_type: str | None = None,
+        since: str | None = None,
+        before: str | None = None,
     ) -> AuditLogResponse:
-        """Get agent audit log."""
+        """Get agent audit log with filtering."""
         params: dict[str, Any] = {}
         if limit is not None:
             params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
-        if action:
-            params["action"] = action
+        if event_type:
+            params["event_type"] = event_type
+        if since:
+            params["since"] = since
+        if before:
+            params["before"] = before
         data = self._get("/api/agent/audit-log", params=params)
         return AuditLogResponse.from_dict(data)
 
     def get_feed(
         self,
         *,
-        channels: list[str] | None = None,
-        markets: list[str] | None = None,
+        since: str,
+        types: str | None = None,
         limit: int | None = None,
     ) -> FeedResponse:
-        """Get recent feed events."""
-        params: dict[str, Any] = {}
-        if channels:
-            params["channels"] = ",".join(channels)
-        if markets:
-            params["markets"] = ",".join(markets)
+        """Get cursor-based event feed.
+
+        Args:
+            since: ISO 8601 timestamp — return events after this time (required).
+            types: Comma-separated event types (market_created, trade, etc.).
+        """
+        params: dict[str, Any] = {"since": since}
+        if types:
+            params["types"] = types
         if limit is not None:
             params["limit"] = limit
         data = self._get("/api/agent/feed", params=params)
         return FeedResponse.from_dict(data)
 
     # -----------------------------------------------------------------------
-    # Deposits
+    # Vault deposits
     # -----------------------------------------------------------------------
 
-    def get_deposit_info(self) -> DepositInfo:
-        """Get vault deposit information."""
+    def get_vault_balance(self) -> VaultBalanceResponse:
+        """Get vault balance, wallet balance, allowance, and deposit history."""
         data = self._get("/api/agent/vault/deposit")
-        return DepositInfo.from_dict(data)
+        return VaultBalanceResponse.from_dict(data)
 
     def deposit(
-        self, amount: float, *, target_balance: bool = False
+        self,
+        *,
+        amount: str | None = None,
+        target_balance: str | None = None,
     ) -> DepositResult:
-        """Deposit USDC into vault (two-step: intent + relay)."""
-        intent_body: dict[str, Any] = {
-            "action": "intent",
-            "amountUsdc": amount,
-        }
-        if target_balance:
-            intent_body["targetBalance"] = True
+        """Deposit USDC into vault (two-step: intent + relay).
+
+        Provide either ``amount`` (USDC in base units) or ``target_balance``
+        (auto-computes delta).
+        """
+        intent_body: dict[str, Any] = {"action": "intent"}
+        if amount is not None:
+            intent_body["amount"] = str(amount)
+        if target_balance is not None:
+            intent_body["targetBalance"] = str(target_balance)
 
         intent = self._post_raw("/api/agent/vault/deposit", json_body=intent_body)
-        relay_body = {**intent, "action": "relay"}
+        intent_id = intent.get("intentId", "")
+        relay_body = {"action": "relay", "intentId": intent_id, "auto_sign": True}
         data = self._post("/api/agent/vault/deposit", json_body=relay_body)
         return _parse(DepositResult, data)
 
@@ -462,24 +591,28 @@ class FlipCoin:
     def stream_feed(
         self,
         *,
-        channels: list[str] | None = None,
-        markets: list[str] | None = None,
+        channels: str,
+        last_event_id: str | None = None,
     ) -> Generator[SSEEvent, None, None]:
         """Stream real-time events via SSE.
 
+        Args:
+            channels: Comma-separated channel subscriptions
+                (e.g. "orderbook:0xabc...,trades:0xabc...,prices").
+            last_event_id: Resume from last event ID on reconnect.
+
         Usage::
 
-            for event in client.stream_feed(channels=["trades", "prices"]):
+            for event in client.stream_feed(channels="trades:0xabc...,prices"):
                 print(event.type, event.data)
         """
-        params: dict[str, str] = {}
-        if channels:
-            params["channels"] = ",".join(channels)
-        if markets:
-            params["markets"] = ",".join(markets)
+        params: dict[str, str] = {"channels": channels}
+        extra_headers = {}
+        if last_event_id:
+            extra_headers["Last-Event-ID"] = last_event_id
 
         with self._client.stream(
-            "GET", "/api/agent/feed/stream", params=params
+            "GET", "/api/agent/feed/stream", params=params, headers=extra_headers,
         ) as response:
             self._raise_for_status(response)
             event_type = "message"
@@ -508,15 +641,14 @@ class FlipCoin:
         self,
         *,
         url: str,
-        events: list[str],
-        secret: str | None = None,
+        event_types: list[str],
     ) -> WebhookCreateResult:
-        """Register a webhook endpoint."""
-        body: dict[str, Any] = {"url": url, "events": events}
-        if secret:
-            body["secret"] = secret
+        """Register a webhook endpoint (max 5, HTTPS required)."""
+        body: dict[str, Any] = {"url": url, "eventTypes": event_types}
         data = self._post("/api/agent/webhooks", json_body=body)
-        return _parse(WebhookCreateResult, data)
+        # Response wraps in {"webhook": {...}}
+        wh_data = data.get("webhook", data)
+        return _parse(WebhookCreateResult, wh_data)
 
     def get_webhooks(self) -> list[Webhook]:
         """List registered webhooks."""
@@ -524,44 +656,68 @@ class FlipCoin:
         return _parse_list(Webhook, data.get("webhooks", []))
 
     def delete_webhook(self, webhook_id: str) -> None:
-        """Delete a webhook."""
+        """Delete a webhook by ID."""
         self._delete(f"/api/agent/webhooks/{webhook_id}")
 
     # -----------------------------------------------------------------------
-    # Private helpers
+    # Public: Leaderboard
     # -----------------------------------------------------------------------
 
-    @staticmethod
-    def _build_market_body(
+    def get_leaderboard(
+        self,
         *,
-        title: str,
-        resolution_criteria: str,
-        resolution_source: str,
-        description: str,
-        category: str,
-        resolution_date: int | None,
-        resolve_end_at: int | None,
-        initial_price_yes_bps: int,
-        liquidity_tier: str,
-        metadata: dict | None,
-    ) -> dict[str, Any]:
-        body: dict[str, Any] = {
-            "title": title,
-            "initialPriceYesBps": initial_price_yes_bps,
-            "liquidityTier": liquidity_tier,
-        }
-        if resolution_criteria:
-            body["resolutionCriteria"] = resolution_criteria
-        if resolution_source:
-            body["resolutionSource"] = resolution_source
-        if description:
-            body["description"] = description
-        if category:
-            body["category"] = category
-        if resolution_date is not None:
-            body["resolutionDate"] = resolution_date
-        if resolve_end_at is not None:
-            body["resolveEndAt"] = resolve_end_at
-        if metadata:
-            body["metadata"] = metadata
-        return body
+        metric: str | None = None,
+        limit: int | None = None,
+    ) -> LeaderboardResponse:
+        """Get public agent leaderboard (no auth required)."""
+        params: dict[str, Any] = {}
+        if metric:
+            params["metric"] = metric
+        if limit is not None:
+            params["limit"] = limit
+        data = self._get("/api/agents/leaderboard", params=params)
+        return LeaderboardResponse.from_dict(data)
+
+
+# ---------------------------------------------------------------------------
+# Shared helper
+# ---------------------------------------------------------------------------
+
+
+def _build_market_body(
+    *,
+    title: str,
+    resolution_criteria: str,
+    resolution_source: str,
+    description: str,
+    category: str,
+    resolution_date: str | None,
+    resolve_start_at: str | None,
+    resolve_end_at: str | None,
+    initial_price_yes_bps: int,
+    liquidity_tier: str,
+    image_url: str | None,
+    metadata: dict | None,
+) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "title": title,
+        "resolutionCriteria": resolution_criteria,
+        "resolutionSource": resolution_source,
+        "initialPriceYesBps": initial_price_yes_bps,
+        "liquidityTier": liquidity_tier,
+    }
+    if description:
+        body["description"] = description
+    if category:
+        body["category"] = category
+    if resolution_date is not None:
+        body["resolutionDate"] = resolution_date
+    if resolve_start_at is not None:
+        body["resolveStartAt"] = resolve_start_at
+    if resolve_end_at is not None:
+        body["resolveEndAt"] = resolve_end_at
+    if image_url:
+        body["imageUrl"] = image_url
+    if metadata:
+        body["metadata"] = metadata
+    return body
