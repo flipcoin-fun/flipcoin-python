@@ -335,13 +335,12 @@ class Market:
     resolution_date: str = ""
     category: str = ""
     fingerprint: str = ""
+    image_url: Optional[str] = None
     # Extended fields from MarketDetailsResponse
     current_price_yes_bps: int = 0
     current_price_no_bps: int = 0
     agent_metadata: Optional[dict] = None
     resolution: Optional[dict] = None
-    image_url: Optional[str] = None
-    url: Optional[str] = None
 
 
 @dataclass
@@ -488,7 +487,6 @@ class CreateMarketResult:
     status: str = ""
     request_id: str = ""
     market_addr: str = ""
-    condition_id: str = ""
     tx_hash: str = ""
     typed_data: Optional[dict] = None
 
