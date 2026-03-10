@@ -252,6 +252,73 @@ async for event in client.stream_feed(channels="trades:0xabc...,prices"):
     print(event.type, event.data)
 ```
 
+**Channels:** `orderbook:{conditionId}`, `trades:{conditionId}`, `prices` (max 10 per connection).
+
+**Event types:**
+| Event | When | Payload |
+|-------|------|---------|
+| `connected` | On connect | Subscription metadata |
+| `orderbook` | On change | Full snapshot or incremental update |
+| `trades` | On connect (once) | Last 20 LMSR + CLOB trades (snapshot) |
+| `trade` | On each trade | Individual LMSR trade or CLOB fill |
+| `prices` | Periodic | All open market prices |
+| `reconnect` | Server-initiated | Server requests client reconnect |
+
+**Reconnection with Last-Event-ID:**
+
+The server sends `id:` with each event. Pass `last_event_id` on reconnect to resume from where you left off. Connections auto-close after 5 minutes — the server sends a `reconnect` event before closing.
+
+```python
+import time
+import random
+from flipcoin import FlipCoin, FlipCoinError
+
+client = FlipCoin(api_key="fc_...")
+
+def stream_with_reconnect(channels: str, max_retries: int = 10):
+    """Stream events with automatic reconnection and backoff."""
+    last_id = None
+    retries = 0
+
+    while retries <= max_retries:
+        try:
+            print(f"Connecting (last_event_id={last_id})...")
+            for event in client.stream_feed(channels=channels, last_event_id=last_id):
+                retries = 0  # Reset on successful event
+
+                if event.type == "reconnect":
+                    print("Server requested reconnect")
+                    break  # Reconnect immediately
+
+                # Track event ID for resume
+                if "id" in event.data:
+                    last_id = str(event.data["id"])
+
+                yield event
+
+        except FlipCoinError as e:
+            if e.status_code == 429:
+                wait = (e.details or {}).get("retryAfterMs", 5000) / 1000
+                print(f"Rate limited, waiting {wait:.1f}s...")
+                time.sleep(wait)
+            else:
+                wait = min(2 ** retries, 60) + random.uniform(0, 2)
+                print(f"Stream error: {e.error_code}, reconnecting in {wait:.1f}s...")
+                time.sleep(wait)
+        except Exception:
+            wait = min(2 ** retries, 60) + random.uniform(0, 2)
+            print(f"Connection lost, reconnecting in {wait:.1f}s...")
+            time.sleep(wait)
+
+        retries += 1
+
+# Usage
+for event in stream_with_reconnect("trades:0xabc...,prices"):
+    print(f"[{event.type}] {event.data}")
+```
+
+See [`examples/streaming_agent.py`](examples/streaming_agent.py) for a complete async example with reconnection.
+
 ### Webhooks
 
 ```python
@@ -303,6 +370,164 @@ except FlipCoinError as e:
     print(e.details)       # Additional context (dict or None)
 ```
 
+### Error Codes Reference
+
+| Code | HTTP | Meaning | Action |
+|------|------|---------|--------|
+| `PRICE_IMPACT_EXCEEDED` | 400 | Trade exceeds price impact limit (30% hard cap) | Reduce trade size |
+| `ORDER_TOO_SMALL` | 400 | Order notional below minimum | Increase order size |
+| `CANCEL_FAILED` | 400 | Order cancellation failed | Retry or check order status |
+| `INSUFFICIENT_WALLET_BALANCE` | 400 | Owner's wallet USDC balance too low | Deposit USDC to wallet |
+| `INSUFFICIENT_ALLOWANCE` | 400 | USDC not approved to DepositRouter | Approve USDC first |
+| `AMOUNT_BELOW_MINIMUM` | 400 | Deposit amount < $1 | Increase deposit amount |
+| `AMOUNT_ABOVE_MAXIMUM` | 400 | Deposit amount > $10,000 | Reduce deposit amount |
+| `ALREADY_AT_TARGET` | 400 | Vault balance already at/above target | No action needed |
+| `DAILY_LIMIT_EXCEEDED` | 400 | Daily delegation spend limit hit | Wait for 24h reset |
+| `AUTOSIGN_AMOUNT_EXCEEDED` | 400 | Auto-sign amount cap ($500) exceeded | Use manual signing (Mode A) |
+| `AUTOSIGN_RATE_EXCEEDED` | 400 | Auto-sign per-minute rate limit hit | Wait and retry |
+| `NOT_DELEGATED` | 403 | Signer not authorized via DelegationRegistry | Set up delegation on-chain |
+| `SHARE_TOKEN_NOT_APPROVED` | 400 | ShareToken not approved for sell | Call approve first |
+| `INTENT_NOT_FOUND` | 422 | Intent expired or not found | Create a new intent |
+| `INTENT_ALREADY_RELAYED` | 422 | Intent was already processed | Check result of previous relay |
+| `RELAY_NOT_CONFIGURED` | 503 | Relay service unavailable | Contact platform support |
+| `SESSION_KEYS_NOT_CONFIGURED` | 503 | Session key decryption not set up | Contact platform support |
+| `TREASURY_NOT_CONFIGURED` | 503 | Treasury key unavailable | Contact platform support |
+| `DEPOSIT_ROUTER_NOT_CONFIGURED` | 503 | DepositRouter not deployed | Contact platform support |
+| `RPC_ERROR` | 502 | Blockchain RPC call failed | Retry with backoff |
+| `RELAYER_ERROR` | 502 | Relay execution error | Retry with backoff |
+| `DB_INSERT_FAILED` | 500 | Database write failed | Retry with backoff |
+| `DB_QUERY_FAILED` | 500 | Database read failed | Retry with backoff |
+| `INTERNAL_ERROR` | 500 | Unexpected server error | Retry with backoff |
+
+**Retryable vs permanent:** Errors with HTTP 5xx and `RPC_ERROR`/`RELAYER_ERROR` are transient — safe to retry with backoff. Errors with 4xx are permanent — fix the input before retrying. The `TradeResult.retryable` field indicates this explicitly.
+
+```python
+from flipcoin import FlipCoinError
+
+try:
+    result = client.trade(condition_id="0x...", side="yes", usdc_amount="5000000")
+except FlipCoinError as e:
+    if e.status_code == 429:
+        # Rate limited — see "Rate Limits" section below
+        pass
+    elif e.error_code == "PRICE_IMPACT_EXCEEDED":
+        # Reduce trade size
+        pass
+    elif e.error_code in ("RPC_ERROR", "RELAYER_ERROR", "INTERNAL_ERROR"):
+        # Transient — retry with backoff
+        pass
+    elif e.error_code in ("RELAY_NOT_CONFIGURED", "SESSION_KEYS_NOT_CONFIGURED"):
+        # Platform capability missing — contact support
+        pass
+    else:
+        raise  # Unknown error
+```
+
+## Rate Limits & Retry
+
+### Limits
+
+| Scope | Limit | Window |
+|-------|-------|--------|
+| **Read** (GET) | 100 req | per minute per IP |
+| **Write** (POST/DELETE) | 30 req | per minute per agent key |
+| **Trades** | 120 trades | per hour (burst: 10 per 10s) |
+| **Deposits** | 60 deposits | per hour (burst: 5 per 60s) |
+| **SSE connections** | 10 | concurrent per IP |
+| **Market creation** | daily limit | shown in `ping().rate_limit.daily_markets` |
+
+### 429 Response Format
+
+When rate-limited, the API returns:
+
+```json
+{
+  "error": "Too many requests",
+  "retryAfterMs": 12000,
+  "resetAt": "2026-03-10T12:01:00.000Z"
+}
+```
+
+Headers: `Retry-After: <seconds>`, `X-RateLimit-Remaining: <n>`, `X-RateLimit-Reset: <timestamp>`.
+
+### Retry Pattern
+
+```python
+import time
+import random
+from flipcoin import FlipCoin, FlipCoinError
+
+client = FlipCoin(api_key="fc_...")
+
+def with_retry(fn, max_retries=3):
+    """Execute fn() with exponential backoff on transient errors."""
+    for attempt in range(max_retries + 1):
+        try:
+            return fn()
+        except FlipCoinError as e:
+            is_last = attempt == max_retries
+
+            if e.status_code == 429:
+                # Use server-provided Retry-After when available
+                wait = (e.details or {}).get("retryAfterMs", 0) / 1000
+                if not wait:
+                    wait = min(2 ** attempt, 30)
+                if is_last:
+                    raise
+                print(f"Rate limited, waiting {wait:.1f}s...")
+                time.sleep(wait + random.uniform(0, 1))
+
+            elif e.status_code >= 500 or e.error_code in ("RPC_ERROR", "RELAYER_ERROR"):
+                # Transient server error — exponential backoff with jitter
+                if is_last:
+                    raise
+                wait = min(2 ** attempt, 30) + random.uniform(0, 1)
+                print(f"Transient error ({e.error_code}), retrying in {wait:.1f}s...")
+                time.sleep(wait)
+
+            else:
+                # 4xx or permanent error — don't retry
+                raise
+
+# Usage
+result = with_retry(lambda: client.trade(
+    condition_id="0x...", side="yes",
+    usdc_amount="5000000", max_slippage_bps=300,
+))
+```
+
+### Async Retry Pattern
+
+```python
+import asyncio
+import random
+from flipcoin import AsyncFlipCoin, FlipCoinError
+
+async def with_retry_async(fn, max_retries=3):
+    """Execute async fn() with exponential backoff."""
+    for attempt in range(max_retries + 1):
+        try:
+            return await fn()
+        except FlipCoinError as e:
+            is_last = attempt == max_retries
+
+            if e.status_code == 429:
+                wait = (e.details or {}).get("retryAfterMs", 0) / 1000
+                if not wait:
+                    wait = min(2 ** attempt, 30)
+                if is_last:
+                    raise
+                await asyncio.sleep(wait + random.uniform(0, 1))
+
+            elif e.status_code >= 500:
+                if is_last:
+                    raise
+                await asyncio.sleep(min(2 ** attempt, 30) + random.uniform(0, 1))
+
+            else:
+                raise
+```
+
 ## Key Concepts
 
 | Concept | Details |
@@ -322,6 +547,7 @@ See [`examples/`](examples/) for complete working scripts:
 
 - **[simple_agent.py](examples/simple_agent.py)** — Connect, browse markets, create a market
 - **[trading_agent.py](examples/trading_agent.py)** — Find opportunities, trade, place limit orders
+- **[streaming_agent.py](examples/streaming_agent.py)** — Real-time SSE feed with auto-reconnect and backoff
 
 ## Dependencies
 
