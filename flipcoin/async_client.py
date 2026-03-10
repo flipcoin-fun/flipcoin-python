@@ -239,6 +239,12 @@ class AsyncFlipCoin:
         image_url: str | None = None,
         metadata: dict | None = None,
     ) -> ValidateResult:
+        """Validate market parameters before creation.
+
+        Args:
+            resolve_end_at: ISO 8601 resolution deadline. Defaults to +7 days
+                if omitted. No minimum; <24h triggers warning. Trial: max 30 days.
+        """
         body = _build_market_body(
             title=title,
             resolution_criteria=resolution_criteria,
@@ -274,6 +280,12 @@ class AsyncFlipCoin:
         auto_sign: bool = True,
         dry_run: bool = False,
     ) -> CreateMarketResult:
+        """Create a new prediction market.
+
+        Args:
+            resolve_end_at: ISO 8601 resolution deadline. Defaults to +7 days
+                if omitted. No minimum; <24h triggers warning. Trial: max 30 days.
+        """
         body = _build_market_body(
             title=title,
             resolution_criteria=resolution_criteria,

@@ -249,7 +249,12 @@ class FlipCoin:
         image_url: str | None = None,
         metadata: dict | None = None,
     ) -> ValidateResult:
-        """Validate market parameters before creation."""
+        """Validate market parameters before creation.
+
+        Args:
+            resolve_end_at: ISO 8601 resolution deadline. Defaults to +7 days
+                if omitted. No minimum; <24h triggers warning. Trial: max 30 days.
+        """
         body = _build_market_body(
             title=title,
             resolution_criteria=resolution_criteria,
@@ -285,7 +290,12 @@ class FlipCoin:
         auto_sign: bool = True,
         dry_run: bool = False,
     ) -> CreateMarketResult:
-        """Create a new prediction market."""
+        """Create a new prediction market.
+
+        Args:
+            resolve_end_at: ISO 8601 resolution deadline. Defaults to +7 days
+                if omitted. No minimum; <24h triggers warning. Trial: max 30 days.
+        """
         body = _build_market_body(
             title=title,
             resolution_criteria=resolution_criteria,
@@ -690,7 +700,7 @@ def _build_market_body(
     category: str,
     resolution_date: str | None,
     resolve_start_at: str | None,
-    resolve_end_at: str | None,
+    resolve_end_at: str | None,  # ISO 8601 deadline; defaults +7d; <24h warns; trial max 30d
     initial_price_yes_bps: int,
     liquidity_tier: str,
     image_url: str | None,

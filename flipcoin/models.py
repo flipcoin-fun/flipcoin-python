@@ -328,7 +328,7 @@ class Market:
     liquidity_usdc: float = 0.0
     trades_count: int = 0
     created_at: str = ""
-    resolve_end_at: str = ""
+    resolve_end_at: str = ""  # ISO 8601 resolution deadline. Defaults to +7d. No minimum; <24h triggers warning. Trial: max 30d.
     resolved_outcome: Optional[bool] = None
     resolution_criteria: str = ""
     resolution_source: str = ""
