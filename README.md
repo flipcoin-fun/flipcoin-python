@@ -387,6 +387,21 @@ except FlipCoinError as e:
 | `AUTOSIGN_RATE_EXCEEDED` | 400 | Auto-sign per-minute rate limit hit | Wait and retry |
 | `NOT_DELEGATED` | 403 | Signer not authorized via DelegationRegistry | Set up delegation on-chain |
 | `SHARE_TOKEN_NOT_APPROVED` | 400 | ShareToken not approved for sell | Call approve first |
+| **On-chain revert errors** | | | |
+| `SlippageExceeded` | 400 | Trade output below minOut | Increase `max_slippage_bps` or reduce size |
+| `IntentExpired` | 400 | Trade intent deadline passed | Create new intent and relay immediately |
+| `BadNonce` | 400 | Nonce mismatch (stale or reused) | Read current nonce and retry |
+| `BadSignature` | 400 | Corrupted or invalid signature | Re-sign with correct params |
+| `IntentAlreadyUsed` | 400 | Intent replay (already executed) | Create a new intent |
+| `MarketNotOpen` | 400 | Market is paused or resolved | Check market status first |
+| `FeeExceedsMax` | 400 | Platform fee exceeds intent's maxFeeBps | Increase `maxFeeBps` or reduce size |
+| `NoBackstop` | 400 | Market not registered in BackstopRouter | Verify market address |
+| `NotTraderOrSigner` | 400 | Signer doesn't match intent fields | Check delegation setup |
+| `DepositExpired` | 400 | Deposit intent deadline passed | Create new deposit intent immediately |
+| `MaxDepositExceeded` | 400 | Deposit exceeds per-tx max | Reduce deposit amount |
+| `ZeroAmount` | 400 | Deposit amount is zero | Provide non-zero amount |
+| `DelegationExpired` | 400 | On-chain delegation has expired | Renew delegation |
+| `ScopeMismatch` | 400 | Delegation scope doesn't match contract | Re-delegate with correct scope |
 | `INTENT_NOT_FOUND` | 422 | Intent expired or not found | Create a new intent |
 | `INTENT_ALREADY_RELAYED` | 422 | Intent was already processed | Check result of previous relay |
 | `RELAY_NOT_CONFIGURED` | 503 | Relay service unavailable | Contact platform support |
@@ -398,6 +413,8 @@ except FlipCoinError as e:
 | `DB_INSERT_FAILED` | 500 | Database write failed | Retry with backoff |
 | `DB_QUERY_FAILED` | 500 | Database read failed | Retry with backoff |
 | `INTERNAL_ERROR` | 500 | Unexpected server error | Retry with backoff |
+
+**On-chain revert decoding:** When a relay transaction is included in a block but reverts on-chain, the platform decodes the exact revert reason (e.g., `SlippageExceeded`, `IntentExpired`). The `TradeResult.error` field contains the decoded reason, `error_code` identifies the specific error, and `retryable` indicates whether it's safe to retry. This replaces the previous generic "Transaction reverted" message.
 
 **Retryable vs permanent:** Errors with HTTP 5xx and `RPC_ERROR`/`RELAYER_ERROR` are transient — safe to retry with backoff. Errors with 4xx are permanent — fix the input before retrying. The `TradeResult.retryable` field indicates this explicitly.
 
@@ -421,6 +438,16 @@ except FlipCoinError as e:
         pass
     else:
         raise  # Unknown error
+
+# On-chain revert errors from relay results
+result = client.trade(condition_id="0x...", side="yes", usdc_amount="5000000")
+if not result.success:
+    if result.retryable:
+        # SlippageExceeded, RouterPaused, InsufficientBalance — safe to retry
+        print(f"Retryable: {result.error}, next nonce: {result.next_nonce}")
+    else:
+        # IntentExpired, BadNonce, BadSignature, etc. — fix input first
+        print(f"Fatal: {result.error} (code: {result.error_code})")
 ```
 
 ## Rate Limits & Retry
