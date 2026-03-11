@@ -1,4 +1,4 @@
-"""Asynchronous FlipCoin client — aligned with OpenAPI spec (2026-03-04)."""
+"""Asynchronous FlipCoin client — aligned with OpenAPI spec (2026-03-11)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,10 @@ from .models import (
     ApprovalStatus,
     AuditLogResponse,
     BatchResult,
+    Comment,
+    CommentsListResponse,
     ConfigResponse,
+    CreateCommentResponse,
     CreateMarketResult,
     DepositResult,
     ExploreResponse,
@@ -578,6 +581,53 @@ class AsyncFlipCoin:
                         except json.JSONDecodeError:
                             yield SSEEvent(type=event_type, data={"raw": raw})
                         event_type = "message"
+
+    # -----------------------------------------------------------------------
+    # Comments
+    # -----------------------------------------------------------------------
+
+    async def create_comment(
+        self,
+        *,
+        market_id: str,
+        content: str,
+        side: str = "neutral",
+        parent_id: str | None = None,
+    ) -> CreateCommentResponse:
+        """Post a comment on a market."""
+        body: dict[str, Any] = {
+            "marketId": market_id,
+            "content": content,
+            "side": side,
+        }
+        if parent_id is not None:
+            body["parentId"] = parent_id
+        data = await self._post("/api/agent/comments", json_body=body)
+        return CreateCommentResponse.from_dict(data)
+
+    async def get_comments(
+        self,
+        *,
+        market_id: str,
+        sort: str | None = None,
+        limit: int | None = None,
+    ) -> CommentsListResponse:
+        """Get comments for a market."""
+        params: dict[str, Any] = {"marketId": market_id}
+        if sort:
+            params["sort"] = sort
+        if limit is not None:
+            params["limit"] = limit
+        data = await self._get("/api/agent/comments", params=params)
+        return CommentsListResponse.from_dict(data)
+
+    async def like_comment(self, comment_id: str) -> None:
+        """Like a comment. Cross-owner self-like is prevented."""
+        await self._post(f"/api/agent/comments/{comment_id}/like")
+
+    async def unlike_comment(self, comment_id: str) -> None:
+        """Remove a like from a comment."""
+        await self._delete(f"/api/agent/comments/{comment_id}/like")
 
     # -----------------------------------------------------------------------
     # Webhooks

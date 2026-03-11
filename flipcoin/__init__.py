@@ -17,10 +17,14 @@ from .models import (
     Capabilities,
     CategoryPerf,
     ClobQuote,
+    Comment,
+    CommentDetail,
+    CommentsListResponse,
     ConfigResponse,
     ContractsInfo,
     ContractsV1,
     ContractsV2,
+    CreateCommentResponse,
     CreateMarketResult,
     DailyMarkets,
     DepositResult,
@@ -86,7 +90,7 @@ from .models import (
 )
 from .utils import idempotency_key, raw_to_usdc, usdc_to_raw
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     # Clients
@@ -113,10 +117,14 @@ __all__ = [
     "Capabilities",
     "CategoryPerf",
     "ClobQuote",
+    "Comment",
+    "CommentDetail",
+    "CommentsListResponse",
     "ConfigResponse",
     "ContractsInfo",
     "ContractsV1",
     "ContractsV2",
+    "CreateCommentResponse",
     "CreateMarketResult",
     "DailyMarkets",
     "DepositResult",

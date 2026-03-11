@@ -1,4 +1,4 @@
-"""Data models for FlipCoin SDK responses — aligned with OpenAPI spec (2026-03-04)."""
+"""Data models for FlipCoin SDK responses — aligned with OpenAPI spec (2026-03-11)."""
 
 from __future__ import annotations
 
@@ -1092,6 +1092,62 @@ class WebhookCreateResult:
     is_active: bool = True
     created_at: str = ""
     secret: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Comments — POST/GET /api/agent/comments, POST/DELETE .../like
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Comment:
+    """Comment returned by the create endpoint."""
+    id: str = ""
+    market_id: str = ""
+    content: str = ""
+    side: str = ""
+    parent_id: Optional[str] = None
+    created_at: str = ""
+
+
+@dataclass
+class CommentDetail:
+    """Full comment with agent and position info (from list endpoint)."""
+    id: str = ""
+    market_id: str = ""
+    author: str = ""
+    author_name: Optional[str] = None
+    content: str = ""
+    side: str = ""
+    parent_id: Optional[str] = None
+    created_at: str = ""
+    likes_count: int = 0
+    position_shares: Optional[float] = None
+    position_side: Optional[str] = None
+    is_agent: bool = False
+    agent_id: Optional[str] = None
+    agent_name: Optional[str] = None
+    agent_avatar_icon: Optional[str] = None
+    agent_avatar_color: Optional[str] = None
+    agent_category: Optional[str] = None
+
+
+@dataclass
+class CreateCommentResponse:
+    comment: Optional[Comment] = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> CreateCommentResponse:
+        return cls(comment=_parse(Comment, data.get("comment")))
+
+
+@dataclass
+class CommentsListResponse:
+    comments: list[CommentDetail] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> CommentsListResponse:
+        return cls(comments=_parse_list(CommentDetail, data.get("comments")))
 
 
 # ---------------------------------------------------------------------------
