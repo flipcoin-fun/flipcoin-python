@@ -344,6 +344,10 @@ class FlipCoin:
     ) -> Quote:
         """Get a price quote with LMSR + CLOB smart routing.
 
+        LMSR quotes are sourced from ``BackstopRouter.quoteBuy`` /
+        ``quoteSell`` contract calls (authoritative); frontend LMSR math
+        is used as fallback only.
+
         Args:
             condition_id: Market condition ID (0x...).
             side: "yes" or "no".
@@ -372,6 +376,9 @@ class FlipCoin:
         venue: str = "auto",
     ) -> TradeResult:
         """Execute a trade (two-step: intent + relay with auto_sign).
+
+        Quotes are sourced from ``BackstopRouter.quoteBuy`` / ``quoteSell``
+        contract calls (authoritative).
 
         For buys, provide ``usdc_amount`` (USDC in base units, 6 decimals).
         For sells, provide ``shares_amount`` (shares in base units, 6 decimals).
