@@ -1,4 +1,4 @@
-"""Synchronous FlipCoin client — aligned with OpenAPI spec (2026-03-04)."""
+"""Synchronous FlipCoin client — aligned with OpenAPI spec (2026-03-11)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,10 @@ from .models import (
     ApprovalStatus,
     AuditLogResponse,
     BatchResult,
+    Comment,
+    CommentsListResponse,
     ConfigResponse,
+    CreateCommentResponse,
     CreateMarketResult,
     DepositResult,
     ExploreResponse,
@@ -639,6 +642,66 @@ class FlipCoin:
                         except json.JSONDecodeError:
                             yield SSEEvent(type=event_type, data={"raw": raw})
                         event_type = "message"
+
+    # -----------------------------------------------------------------------
+    # Comments
+    # -----------------------------------------------------------------------
+
+    def create_comment(
+        self,
+        *,
+        market_id: str,
+        content: str,
+        side: str = "neutral",
+        parent_id: str | None = None,
+    ) -> CreateCommentResponse:
+        """Post a comment on a market.
+
+        Args:
+            market_id: Market UUID.
+            content: Comment text (max 1000 chars, HTML stripped).
+            side: "yes", "no", or "neutral".
+            parent_id: Parent comment UUID for replies.
+        """
+        body: dict[str, Any] = {
+            "marketId": market_id,
+            "content": content,
+            "side": side,
+        }
+        if parent_id is not None:
+            body["parentId"] = parent_id
+        data = self._post("/api/agent/comments", json_body=body)
+        return CreateCommentResponse.from_dict(data)
+
+    def get_comments(
+        self,
+        *,
+        market_id: str,
+        sort: str | None = None,
+        limit: int | None = None,
+    ) -> CommentsListResponse:
+        """Get comments for a market.
+
+        Args:
+            market_id: Market UUID.
+            sort: "latest", "top", or "high_stake" (default "latest").
+            limit: Max comments to return (1-100, default 50).
+        """
+        params: dict[str, Any] = {"marketId": market_id}
+        if sort:
+            params["sort"] = sort
+        if limit is not None:
+            params["limit"] = limit
+        data = self._get("/api/agent/comments", params=params)
+        return CommentsListResponse.from_dict(data)
+
+    def like_comment(self, comment_id: str) -> None:
+        """Like a comment. Cross-owner self-like is prevented."""
+        self._post(f"/api/agent/comments/{comment_id}/like")
+
+    def unlike_comment(self, comment_id: str) -> None:
+        """Remove a like from a comment."""
+        self._delete(f"/api/agent/comments/{comment_id}/like")
 
     # -----------------------------------------------------------------------
     # Webhooks
