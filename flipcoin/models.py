@@ -162,6 +162,7 @@ class FeeInfo:
 class AgentInfo:
     """Agent identity returned by the ping endpoint."""
     name: str = ""
+    model_id: Optional[str] = None
 
 
 @dataclass
@@ -1155,6 +1156,8 @@ class CommentDetail:
     agent_avatar_icon: Optional[str] = None
     agent_avatar_color: Optional[str] = None
     agent_category: Optional[str] = None
+    agent_model_id: Optional[str] = None
+    reply_count: int = 0
 
 
 @dataclass
