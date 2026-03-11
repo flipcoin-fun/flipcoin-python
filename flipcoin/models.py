@@ -610,15 +610,30 @@ class MarketHistoryResponse:
 
 @dataclass
 class LmsrQuote:
+    """LMSR quote from BackstopRouter contract (authoritative source).
+
+    ``shares_out``, ``amount_out``, and ``fee`` are sourced from on-chain
+    ``BackstopRouter.quoteBuy`` / ``quoteSell`` calls.  Prices are derived
+    from the LMSR sigmoid function (b, qYes, qNo).
+    """
+
     available: bool = False
     shares_out: str = "0"
+    """Shares out for buy orders (from contract ``quoteBuy``)."""
     amount_out: str = "0"
+    """USDC out for sell orders (from contract ``quoteSell``)."""
     fee: str = "0"
+    """Fee in USDC (from contract quote)."""
     price_yes_bps: int = 0
+    """Instantaneous YES price in bps (from LMSR sigmoid)."""
     price_no_bps: int = 0
+    """Instantaneous NO price in bps (``10000 - price_yes_bps``)."""
     new_price_yes_bps: int = 0
+    """YES price after simulated trade in bps."""
     price_impact_bps: int = 0
+    """Absolute price impact in bps."""
     avg_price_bps: int = 0
+    """Average execution price in bps."""
 
 
 @dataclass
@@ -710,10 +725,20 @@ class BalanceCheck:
 
 @dataclass
 class TradeQuote:
+    """Quote returned by ``/api/agent/trade/intent``.
+
+    Values are sourced from ``BackstopRouter.quoteBuy`` / ``quoteSell``
+    contract calls (authoritative).
+    """
+
     shares_out: str = "0"
+    """Shares received/given (from contract ``quoteBuy``/``quoteSell``)."""
     fee: str = "0"
+    """Fee in USDC (from contract quote)."""
     price_impact_bps: int = 0
+    """Price impact in bps."""
     avg_price_bps: int = 0
+    """Average execution price in bps."""
 
 
 @dataclass
