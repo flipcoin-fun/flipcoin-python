@@ -1,4 +1,4 @@
-"""Data models for FlipCoin SDK responses — aligned with OpenAPI spec (2026-03-13)."""
+"""Data models for FlipCoin SDK responses — aligned with actual API (2026-03-13)."""
 
 from __future__ import annotations
 
@@ -164,7 +164,6 @@ class FeeInfo:
 class AgentInfo:
     """Agent identity returned by the ping endpoint."""
     name: str = ""
-    model_id: Optional[str] = None
 
 
 @dataclass
@@ -201,35 +200,18 @@ class PingResponse:
 
 
 @dataclass
-class ContractsV1:
-    factory: str = ""
-    vault: str = ""
-
-
-@dataclass
-class ContractsV2:
-    factory: str = ""
-    vault: str = ""
+class Contracts:
+    """Flat map of contract addresses (keys depend on deployment)."""
+    factory_v1: str = ""
+    vault_v1: str = ""
+    factory_v2: str = ""
     exchange: str = ""
     backstop_router: str = ""
     share_token: str = ""
+    vault_v2: str = ""
     delegation_registry: str = ""
     deposit_router: str = ""
-
-
-@dataclass
-class ContractsInfo:
-    v1: Optional[ContractsV1] = None
-    v2: Optional[ContractsV2] = None
-
-    @classmethod
-    def from_dict(cls, data: dict | None) -> Optional[ContractsInfo]:
-        if not data:
-            return None
-        return cls(
-            v1=_parse(ContractsV1, data.get("v1")),
-            v2=_parse(ContractsV2, data.get("v2")),
-        )
+    usdc: str = ""
 
 
 @dataclass
@@ -239,29 +221,57 @@ class Capabilities:
     session_keys: bool = False
     treasury: bool = False
     deposit: bool = False
+    withdraw: bool = False
+    resolution: bool = False
+
+
+@dataclass
+class LmsrConfig:
+    quote_validity_seconds: int = 0
+    default_slippage_bps: int = 0
+    default_max_fee_bps: int = 0
+
+
+@dataclass
+class ClobConfig:
+    time_in_force_options: list[str] = field(default_factory=list)
+    max_order_duration_days: int = 0
 
 
 @dataclass
 class AutoSignLimits:
     max_trade_usdc: str = ""
     max_tx_per_minute: int = 0
-    max_deposit_usdc: str = ""
-    max_deposit_per_minute: int = 0
+
+
+@dataclass
+class TradingRateLimit:
+    sustained: str = ""
+    burst: str = ""
 
 
 @dataclass
 class TradingConfig:
     venues: list[str] = field(default_factory=list)
+    lmsr: Optional[LmsrConfig] = None
+    clob: Optional[ClobConfig] = None
     auto_sign: Optional[AutoSignLimits] = None
-    quote_validity_seconds: int = 0
+    rate_limit: Optional[TradingRateLimit] = None
 
     @classmethod
     def from_dict(cls, data: dict | None) -> Optional[TradingConfig]:
         if not data:
             return None
         obj = _parse(cls, data)
-        if obj and isinstance(data.get("auto_sign"), dict):
-            obj.auto_sign = _parse(AutoSignLimits, data["auto_sign"])
+        if obj:
+            if isinstance(data.get("lmsr"), dict):
+                obj.lmsr = _parse(LmsrConfig, data["lmsr"])
+            if isinstance(data.get("clob"), dict):
+                obj.clob = _parse(ClobConfig, data["clob"])
+            if isinstance(data.get("auto_sign"), dict):
+                obj.auto_sign = _parse(AutoSignLimits, data["auto_sign"])
+            if isinstance(data.get("rate_limit"), dict):
+                obj.rate_limit = _parse(TradingRateLimit, data["rate_limit"])
         return obj
 
 
@@ -269,46 +279,82 @@ class TradingConfig:
 class LimitsInfo:
     min_trade_usdc: str = ""
     max_trade_usdc: str = ""
+    max_batch_size: int = 0
+    daily_market_cap_per_agent: int = 0
+    daily_market_cap_per_owner: int = 0
+    daily_trades_per_agent: int = 0
+    daily_trades_per_owner: int = 0
+
+
+@dataclass
+class FeesConfig:
+    lmsr_trading_fee_bps: int = 0
+    clob_maker_fee_bps: int = 0
+    clob_taker_fee_bps: int = 0
+    note: str = ""
+
+
+@dataclass
+class VaultAutoSignConfig:
+    max_deposit_usdc: str = ""
+    max_tx_per_minute: int = 0
 
 
 @dataclass
 class VaultConfig:
     min_deposit_usdc: str = ""
     max_deposit_usdc: str = ""
+    intent_expiry_seconds: int = 0
+    auto_sign: Optional[VaultAutoSignConfig] = None
+    note: str = ""
+    min_withdraw_usdc: str = ""
+    max_withdraw_usdc: str = ""
+    withdraw_intent_expiry_seconds: int = 0
+    withdraw_auto_sign_supported: bool = False
+    withdraw_note: str = ""
+
+    @classmethod
+    def from_dict(cls, data: dict | None) -> Optional[VaultConfig]:
+        if not data:
+            return None
+        obj = _parse(cls, data)
+        if obj and isinstance(data.get("auto_sign"), dict):
+            obj.auto_sign = _parse(VaultAutoSignConfig, data["auto_sign"])
+        return obj
 
 
 @dataclass
 class UnitsConfig:
-    usdc_decimals: int = 6
-    price_unit: str = "bps"
-    volume_definition: str = ""
+    price: str = ""
+    usdc: str = ""
+    volume: str = ""
 
 
 @dataclass
 class ConfigResponse:
-    success: bool = False
     chain_id: int = 0
     mode: str = ""
     fee_recipient_policy: str = ""
-    contracts: Optional[ContractsInfo] = None
+    contracts: Optional[Contracts] = None
     capabilities: Optional[Capabilities] = None
     limits: Optional[LimitsInfo] = None
     trading: Optional[TradingConfig] = None
+    fees: Optional[FeesConfig] = None
     vault: Optional[VaultConfig] = None
     units: Optional[UnitsConfig] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> ConfigResponse:
         return cls(
-            success=data.get("success", False),
             chain_id=data.get("chain_id", 0),
             mode=data.get("mode", ""),
             fee_recipient_policy=data.get("fee_recipient_policy", ""),
-            contracts=ContractsInfo.from_dict(data.get("contracts")),
+            contracts=_parse(Contracts, data.get("contracts")),
             capabilities=_parse(Capabilities, data.get("capabilities")),
             limits=_parse(LimitsInfo, data.get("limits")),
             trading=TradingConfig.from_dict(data.get("trading")),
-            vault=_parse(VaultConfig, data.get("vault")),
+            fees=_parse(FeesConfig, data.get("fees")),
+            vault=VaultConfig.from_dict(data.get("vault")),
             units=_parse(UnitsConfig, data.get("units")),
         )
 
@@ -320,7 +366,16 @@ class ConfigResponse:
 
 @dataclass
 class Market:
-    """Market summary (from explore or agent markets list)."""
+    """Market summary (from explore or agent markets list).
+
+    Field availability varies by endpoint:
+    - explore: full set (id through fingerprint)
+    - listAgentMarkets: thin subset (id, market_addr, condition_id, title,
+      description, status, volume_usdc, trades_count, created_at)
+    - getMarketDetails: full set plus extended fields (current_price_*,
+      volume_by_source, last_activity_at, resolve_start_at, resolved_at,
+      created_by_agent_id, agent_metadata)
+    """
     id: str = ""
     market_addr: str = ""
     condition_id: str = ""
@@ -335,17 +390,17 @@ class Market:
     resolve_end_at: str = ""
     resolved_outcome: Optional[bool] = None
     creator_addr: Optional[str] = None
-    resolution_criteria: str = ""
-    resolution_source: str = ""
-    resolution_date: str = ""
-    category: str = ""
     fingerprint: str = ""
     image_url: Optional[str] = None
     # Extended fields from MarketDetailsResponse
     current_price_yes_bps: int = 0
     current_price_no_bps: int = 0
+    volume_by_source: Optional[dict] = None
+    last_activity_at: Optional[str] = None
+    resolve_start_at: Optional[str] = None
+    resolved_at: Optional[str] = None
+    created_by_agent_id: Optional[str] = None
     agent_metadata: Optional[dict] = None
-    resolution: Optional[dict] = None
 
 
 @dataclass
@@ -1286,10 +1341,21 @@ class WithdrawBalanceResponse:
 
 @dataclass
 class WithdrawResult:
+    """Result from withdraw intent or relay.
+
+    Intent response includes ``transaction``, ``valid_until``, ``preflight``.
+    Relay response includes ``tx_hash``, ``amount``, ``error``, etc.
+    """
     intent_id: str = ""
     status: str = ""
     tx_hash: Optional[str] = None
     amount: str = "0"
+    # Intent-specific fields
+    transaction: Optional[dict] = None
+    valid_until: Optional[str] = None
+    preflight: Optional[dict] = None
+    cached: bool = False
+    # Relay-specific fields
     error: Optional[str] = None
     error_code: Optional[str] = None
     retryable: bool = False
