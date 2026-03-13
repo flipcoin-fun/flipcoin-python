@@ -1,4 +1,4 @@
-"""Data models for FlipCoin SDK responses — aligned with OpenAPI spec (2026-03-11)."""
+"""Data models for FlipCoin SDK responses — aligned with OpenAPI spec (2026-03-13)."""
 
 from __future__ import annotations
 
@@ -102,6 +102,7 @@ class RateLimitInfo:
     write: Optional[RateLimitBucket] = None
     create: Optional[RateLimitBucket] = None
     trade: Optional[RateLimitBucket] = None
+    autosign: Optional[RateLimitBucket] = None
     daily_markets: Optional[DailyMarkets] = None
 
     @classmethod
@@ -113,6 +114,7 @@ class RateLimitInfo:
             write=_parse(RateLimitBucket, data.get("write")),
             create=_parse(RateLimitBucket, data.get("create")),
             trade=_parse(RateLimitBucket, data.get("trade")),
+            autosign=_parse(RateLimitBucket, data.get("autosign")),
             daily_markets=_parse(DailyMarkets, data.get("daily_markets")),
         )
 
@@ -329,8 +331,10 @@ class Market:
     liquidity_usdc: float = 0.0
     trades_count: int = 0
     created_at: str = ""
-    resolve_end_at: str = ""  # ISO 8601 resolution deadline. Defaults to +7d. No minimum; <24h triggers warning. Trial: max 30d.
+    updated_at: Optional[str] = None
+    resolve_end_at: str = ""
     resolved_outcome: Optional[bool] = None
+    creator_addr: Optional[str] = None
     resolution_criteria: str = ""
     resolution_source: str = ""
     resolution_date: str = ""
@@ -1186,23 +1190,169 @@ class CommentsListResponse:
 @dataclass
 class LeaderboardEntry:
     rank: int = 0
+    agent_id: str = ""
     agent_name: str = ""
     owner_addr: str = ""
-    volume: str = "0"
-    fees: str = "0"
+    owner_name: Optional[str] = None
+    total_volume_usdc: str = "0"
+    estimated_fees_usdc: str = "0"
     markets_created: int = 0
+    live_markets: int = 0
+    resolved_markets: int = 0
+    is_active: bool = True
+    avatar_icon: str = ""
+    avatar_color: str = ""
+    bio: Optional[str] = None
+    primary_category: Optional[str] = None
+    last_activity_at: Optional[str] = None
 
 
 @dataclass
 class LeaderboardResponse:
-    success: bool = False
-    leaderboard: list[LeaderboardEntry] = field(default_factory=list)
-    metric: str = ""
+    entries: list[LeaderboardEntry] = field(default_factory=list)
+    pagination: Optional[Pagination] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> LeaderboardResponse:
         return cls(
-            success=data.get("success", False),
-            leaderboard=_parse_list(LeaderboardEntry, data.get("leaderboard")),
-            metric=data.get("metric", ""),
+            entries=_parse_list(LeaderboardEntry, data.get("entries")),
+            pagination=_parse(Pagination, data.get("pagination")),
         )
+
+
+# ---------------------------------------------------------------------------
+# Trade history — GET /api/agent/trade/history
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class TradeHistoryEntry:
+    id: int = 0
+    market_addr: str = ""
+    condition_id: Optional[str] = None
+    tx_hash: str = ""
+    side: str = ""
+    amount_usdc: float = 0.0
+    shares: float = 0.0
+    fee: float = 0.0
+    price_yes_bps: int = 0
+    block_number: int = 0
+    event_time: str = ""
+    source: str = ""
+
+
+@dataclass
+class TradeHistoryResponse:
+    trades: list[TradeHistoryEntry] = field(default_factory=list)
+    pagination: Optional[Pagination] = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> TradeHistoryResponse:
+        return cls(
+            trades=_parse_list(TradeHistoryEntry, data.get("trades")),
+            pagination=_parse(Pagination, data.get("pagination")),
+        )
+
+
+# ---------------------------------------------------------------------------
+# Vault withdrawals — GET/POST /api/agent/vault/withdraw
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RecentWithdrawal:
+    id: str = ""
+    amount: str = "0"
+    destination: str = ""
+    status: str = ""
+    tx_hash: Optional[str] = None
+    created_at: str = ""
+
+
+@dataclass
+class WithdrawBalanceResponse:
+    vault_balance: str = "0"
+    wallet_balance: str = "0"
+    auto_sign_supported: bool = False
+    recent_withdrawals: list[RecentWithdrawal] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> WithdrawBalanceResponse:
+        obj = _parse(cls, data)
+        if obj:
+            obj.recent_withdrawals = _parse_list(RecentWithdrawal, data.get("recent_withdrawals"))
+        return obj
+
+
+@dataclass
+class WithdrawResult:
+    intent_id: str = ""
+    status: str = ""
+    tx_hash: Optional[str] = None
+    amount: str = "0"
+    error: Optional[str] = None
+    error_code: Optional[str] = None
+    retryable: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Portfolio redeem — POST /api/agent/portfolio/redeem
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RedeemPosition:
+    condition_id: str = ""
+    redeemable: bool = False
+    resolution_status: int = 0
+    outcome: Optional[str] = None
+    yes_shares: str = "0"
+    no_shares: str = "0"
+    winning_shares: str = "0"
+    expected_payout: str = "0"
+    payout_per_share: str = "0"
+    market_addr: Optional[str] = None
+    title: Optional[str] = None
+    transaction: Optional[dict] = None
+    hint: str = ""
+    reason: Optional[str] = None
+    error_code: Optional[str] = None
+
+
+@dataclass
+class RedeemBatchResponse:
+    positions: list[RedeemPosition] = field(default_factory=list)
+    summary: Optional[dict] = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> RedeemBatchResponse:
+        return cls(
+            positions=_parse_list(RedeemPosition, data.get("positions")),
+            summary=data.get("summary"),
+        )
+
+
+# ---------------------------------------------------------------------------
+# Resolution — POST /api/agent/markets/{address}/propose-resolution
+#              POST /api/agent/markets/{address}/finalize-resolution
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ProposeResolutionResult:
+    status: str = ""
+    market_addr: str = ""
+    tx_hash: str = ""
+    outcome: str = ""
+    proposed_at: str = ""
+    finalize_after: str = ""
+    dispute_period_hours: int = 0
+
+
+@dataclass
+class FinalizeResolutionResult:
+    status: str = ""
+    market_addr: str = ""
+    tx_hash: str = ""
+    outcome: str = ""
+    payout_per_share: str = ""
