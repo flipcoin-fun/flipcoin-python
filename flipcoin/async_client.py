@@ -1,4 +1,4 @@
-"""Asynchronous FlipCoin client — aligned with OpenAPI spec (2026-03-11)."""
+"""Asynchronous FlipCoin client — aligned with OpenAPI spec (2026-03-13)."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from .models import (
     DepositResult,
     ExploreResponse,
     FeedResponse,
+    FinalizeResolutionResult,
     FlipCoinError,
     LeaderboardResponse,
     Market,
@@ -34,14 +35,20 @@ from .models import (
     PerformanceResponse,
     PingResponse,
     PortfolioResponse,
+    ProposeResolutionResult,
     Quote,
+    RedeemBatchResponse,
+    RedeemPosition,
     SSEEvent,
+    TradeHistoryResponse,
     TradeNonceResponse,
     TradeResult,
     ValidateResult,
     VaultBalanceResponse,
     Webhook,
     WebhookCreateResult,
+    WithdrawBalanceResponse,
+    WithdrawResult,
     _parse,
     _parse_list,
 )
@@ -321,6 +328,45 @@ class AsyncFlipCoin:
         return BatchResult.from_dict(data)
 
     # -----------------------------------------------------------------------
+    # Resolution
+    # -----------------------------------------------------------------------
+
+    async def propose_resolution(
+        self,
+        address: str,
+        *,
+        outcome: str,
+        reason: str,
+        evidence_url: str | None = None,
+    ) -> ProposeResolutionResult:
+        """Propose resolution for a market.
+
+        Args:
+            address: Market contract address.
+            outcome: Resolution outcome ("yes", "no", or "invalid").
+            reason: Resolution reason (10-2000 chars).
+            evidence_url: Optional evidence URL.
+        """
+        body: dict[str, Any] = {"outcome": outcome, "reason": reason}
+        if evidence_url:
+            body["evidenceUrl"] = evidence_url
+        data = await self._post(
+            f"/api/agent/markets/{address}/propose-resolution", json_body=body
+        )
+        return _parse(ProposeResolutionResult, data)
+
+    async def finalize_resolution(self, address: str) -> FinalizeResolutionResult:
+        """Finalize resolution after 24h dispute period.
+
+        Args:
+            address: Market contract address.
+        """
+        data = await self._post(
+            f"/api/agent/markets/{address}/finalize-resolution", json_body={}
+        )
+        return _parse(FinalizeResolutionResult, data)
+
+    # -----------------------------------------------------------------------
     # Trading (LMSR AMM via BackstopRouter)
     # -----------------------------------------------------------------------
 
@@ -403,6 +449,38 @@ class AsyncFlipCoin:
         data = await self._get("/api/agent/trade/approve")
         return ApprovalStatus.from_dict(data)
 
+    async def get_trade_history(
+        self,
+        *,
+        limit: int | None = None,
+        offset: int | None = None,
+        market: str | None = None,
+        side: str | None = None,
+        source: str | None = None,
+    ) -> TradeHistoryResponse:
+        """Get agent trade history across all markets.
+
+        Args:
+            limit: Max results per page (default 50, max 100).
+            offset: Pagination offset.
+            market: Filter by market address (0x...).
+            side: Filter by trade side ("yes" or "no").
+            source: Filter by trade source ("lmsr" or "clob").
+        """
+        params: dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if market:
+            params["market"] = market
+        if side:
+            params["side"] = side
+        if source:
+            params["source"] = source
+        data = await self._get("/api/agent/trade/history", params=params)
+        return TradeHistoryResponse.from_dict(data)
+
     # -----------------------------------------------------------------------
     # CLOB orders
     # -----------------------------------------------------------------------
@@ -479,6 +557,28 @@ class AsyncFlipCoin:
             params["status"] = status
         data = await self._get("/api/agent/portfolio", params=params)
         return PortfolioResponse.from_dict(data)
+
+    async def redeem_positions(self, condition_id: str) -> RedeemPosition:
+        """Check redeemability and get calldata for a single position.
+
+        Args:
+            condition_id: Bytes32 conditionId (0x-prefixed, 66 chars).
+        """
+        body: dict[str, Any] = {"conditionId": condition_id}
+        data = await self._post("/api/agent/portfolio/redeem", json_body=body)
+        return _parse(RedeemPosition, data)
+
+    async def redeem_positions_batch(
+        self, condition_ids: list[str]
+    ) -> RedeemBatchResponse:
+        """Check redeemability and get calldata for multiple positions (up to 10).
+
+        Args:
+            condition_ids: List of bytes32 conditionIds.
+        """
+        body: dict[str, Any] = {"conditionIds": condition_ids}
+        data = await self._post("/api/agent/portfolio/redeem", json_body=body)
+        return RedeemBatchResponse.from_dict(data)
 
     # -----------------------------------------------------------------------
     # Analytics
@@ -564,6 +664,52 @@ class AsyncFlipCoin:
         relay_body = {"action": "relay", "intentId": intent_id, "auto_sign": True}
         data = await self._post("/api/agent/vault/deposit", json_body=relay_body)
         return _parse(DepositResult, data)
+
+    # -----------------------------------------------------------------------
+    # Vault withdrawals
+    # -----------------------------------------------------------------------
+
+    async def get_withdraw_info(self) -> WithdrawBalanceResponse:
+        """Get vault balance, wallet balance, and recent withdrawal history."""
+        data = await self._get("/api/agent/vault/withdraw")
+        return WithdrawBalanceResponse.from_dict(data)
+
+    async def withdraw(
+        self,
+        *,
+        amount: str | None = None,
+        target_balance: str | None = None,
+        signed_transaction: str | None = None,
+        intent_id: str | None = None,
+    ) -> WithdrawResult:
+        """Withdraw USDC from vault.
+
+        Two usage modes:
+
+        **Intent mode** (get raw tx to sign): provide ``amount`` or
+        ``target_balance``.  Returns intent with raw transaction data.
+
+        **Relay mode** (broadcast signed tx): provide ``intent_id`` and
+        ``signed_transaction``.
+
+        Unlike deposits, auto-sign is NOT supported — owner must sign.
+        """
+        if intent_id and signed_transaction:
+            body: dict[str, Any] = {
+                "action": "relay",
+                "intentId": intent_id,
+                "signedTransaction": signed_transaction,
+            }
+            data = await self._post("/api/agent/vault/withdraw", json_body=body)
+            return _parse(WithdrawResult, data)
+
+        body = {"action": "intent"}
+        if amount is not None:
+            body["amount"] = str(amount)
+        if target_balance is not None:
+            body["targetBalance"] = str(target_balance)
+        data = await self._post_raw("/api/agent/vault/withdraw", json_body=body)
+        return _parse(WithdrawResult, data)
 
     # -----------------------------------------------------------------------
     # Real-time streaming (SSE)
@@ -679,12 +825,34 @@ class AsyncFlipCoin:
         self,
         *,
         metric: str | None = None,
+        sort: str | None = None,
+        category: str | None = None,
+        include_inactive: bool | None = None,
         limit: int | None = None,
+        offset: int | None = None,
     ) -> LeaderboardResponse:
+        """Get public agent leaderboard (no auth required).
+
+        Args:
+            metric: Ranking metric (volume, fees, markets, resolved, live).
+            sort: Alias for metric parameter.
+            category: Filter by agent primary category.
+            include_inactive: Include agents with 0 markets and 0 volume.
+            limit: Maximum number of results (default: 50, max: 100).
+            offset: Pagination offset.
+        """
         params: dict[str, Any] = {}
         if metric:
             params["metric"] = metric
+        if sort:
+            params["sort"] = sort
+        if category:
+            params["category"] = category
+        if include_inactive is not None:
+            params["includeInactive"] = "true" if include_inactive else "false"
         if limit is not None:
             params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
         data = await self._get("/api/agents/leaderboard", params=params)
         return LeaderboardResponse.from_dict(data)

@@ -35,6 +35,7 @@ from .models import (
     FeedResponse,
     FeeInfo,
     Fill,
+    FinalizeResolutionResult,
     FlipCoinError,
     HistoryPoint,
     LeaderboardEntry,
@@ -61,10 +62,14 @@ from .models import (
     PortfolioTotals,
     Position,
     PriceImpactGuard,
+    ProposeResolutionResult,
     Quote,
     RateLimitBucket,
     RateLimitInfo,
     RecentDeposit,
+    RecentWithdrawal,
+    RedeemBatchResponse,
+    RedeemPosition,
     ResolutionInfo,
     SSEEvent,
     SeedSubsidyInfo,
@@ -73,6 +78,8 @@ from .models import (
     SplitLeg,
     SplitLegs,
     Trade,
+    TradeHistoryEntry,
+    TradeHistoryResponse,
     TradeIntentResponse,
     TradeNonceResponse,
     TradeQuote,
@@ -87,10 +94,12 @@ from .models import (
     VolumeBySource,
     Webhook,
     WebhookCreateResult,
+    WithdrawBalanceResponse,
+    WithdrawResult,
 )
 from .utils import idempotency_key, raw_to_usdc, usdc_to_raw
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     # Clients
@@ -135,6 +144,7 @@ __all__ = [
     "FeedResponse",
     "FeeInfo",
     "Fill",
+    "FinalizeResolutionResult",
     "HistoryPoint",
     "LeaderboardEntry",
     "LeaderboardResponse",
@@ -160,10 +170,14 @@ __all__ = [
     "PortfolioTotals",
     "Position",
     "PriceImpactGuard",
+    "ProposeResolutionResult",
     "Quote",
     "RateLimitBucket",
     "RateLimitInfo",
     "RecentDeposit",
+    "RecentWithdrawal",
+    "RedeemBatchResponse",
+    "RedeemPosition",
     "ResolutionInfo",
     "SSEEvent",
     "SeedSubsidyInfo",
@@ -172,6 +186,8 @@ __all__ = [
     "SplitLeg",
     "SplitLegs",
     "Trade",
+    "TradeHistoryEntry",
+    "TradeHistoryResponse",
     "TradeIntentResponse",
     "TradeNonceResponse",
     "TradeQuote",
@@ -186,4 +202,6 @@ __all__ = [
     "VolumeBySource",
     "Webhook",
     "WebhookCreateResult",
+    "WithdrawBalanceResponse",
+    "WithdrawResult",
 ]
