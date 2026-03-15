@@ -644,8 +644,21 @@ class AsyncFlipCoin:
     # -----------------------------------------------------------------------
 
     async def get_vault_balance(self) -> VaultBalanceResponse:
+        """Get vault balance, wallet balance, allowance, and deposit history."""
         data = await self._get("/api/agent/vault/deposit")
         return VaultBalanceResponse.from_dict(data)
+
+    async def needs_approval(self) -> tuple[bool, str]:
+        """Check whether USDC approval to DepositRouter is needed.
+
+        Returns:
+            A ``(needs_approve, spender)`` tuple.  ``needs_approve`` is
+            ``True`` when the owner must call ``USDC.approve(spender, amount)``
+            on-chain before depositing.  ``spender`` is the DepositRouter
+            contract address (empty string when not applicable).
+        """
+        info = await self.get_vault_balance()
+        return info.approval_required, info.deposit_router_address
 
     async def deposit(
         self,
@@ -653,6 +666,20 @@ class AsyncFlipCoin:
         amount: str | None = None,
         target_balance: str | None = None,
     ) -> DepositResult:
+        """Deposit USDC into vault (two-step: intent + relay).
+
+        Provide either ``amount`` (USDC in base units) or ``target_balance``
+        (auto-computes delta).
+
+        **Prerequisites**: Owner must approve USDC spending to the
+        **DepositRouter** contract (not VaultV2) before the first deposit.
+        Use :meth:`get_vault_balance` to check ``approval_required`` and
+        ``deposit_router_address``, then call ``USDC.approve(spender, amount)``
+        on-chain.  If approval is missing the relay will revert with
+        ``INSUFFICIENT_ALLOWANCE``.
+
+        Limits: min $1, max $10,000; auto-sign max $500.
+        """
         intent_body: dict[str, Any] = {"action": "intent"}
         if amount is not None:
             intent_body["amount"] = str(amount)
