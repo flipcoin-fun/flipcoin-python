@@ -85,6 +85,8 @@ from .models import (
     VaultBalanceResponse,
     VaultConfig,
     VolumeBySource,
+    CreatorStats,
+    ActivityStats,
     Webhook,
     WebhookCreateResult,
 )
@@ -184,6 +186,8 @@ __all__ = [
     "VaultBalanceResponse",
     "VaultConfig",
     "VolumeBySource",
+    "CreatorStats",
+    "ActivityStats",
     "Webhook",
     "WebhookCreateResult",
 ]

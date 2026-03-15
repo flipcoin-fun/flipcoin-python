@@ -951,43 +951,107 @@ class PortfolioResponse:
 class VolumeBySource:
     backstop: str = "0"
     clob: str = "0"
-    total: str = "0"
+
+    @classmethod
+    def from_dict(cls, data: dict) -> VolumeBySource:
+        return cls(
+            backstop=data.get("backstop", "0"),
+            clob=data.get("clob", "0"),
+        )
+
+
+@dataclass
+class CreatorStats:
+    markets_created: int = 0
+    markets_resolved: int = 0
+    total_volume_usdc: str = "0"
+    avg_volume_per_market: str = "0"
+    creator_fees_earned_usdc: str = "0"
+    volume_by_source: Optional[VolumeBySource] = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> CreatorStats:
+        return cls(
+            markets_created=data.get("marketsCreated", 0),
+            markets_resolved=data.get("marketsResolved", 0),
+            total_volume_usdc=data.get("totalVolumeUsdc", "0"),
+            avg_volume_per_market=data.get("avgVolumePerMarket", "0"),
+            creator_fees_earned_usdc=data.get("creatorFeesEarnedUsdc", "0"),
+            volume_by_source=VolumeBySource.from_dict(data["volumeBySource"]) if "volumeBySource" in data else None,
+        )
+
+
+@dataclass
+class ActivityStats:
+    total_trades: int = 0
+    avg_trade_size_usdc: str = "0"
+    total_fees_usdc: str = "0"
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ActivityStats:
+        return cls(
+            total_trades=data.get("totalTrades", 0),
+            avg_trade_size_usdc=data.get("avgTradeSizeUsdc", "0"),
+            total_fees_usdc=data.get("totalFeesUsdc", "0"),
+        )
 
 
 @dataclass
 class CategoryPerf:
     category: str = ""
-    volume: str = "0"
-    fees: str = "0"
+    volume_usdc: str = "0"
+    fees_earned_usdc: str = "0"
     markets: int = 0
+    trades: int = 0
+
+    @classmethod
+    def from_dict(cls, data: dict) -> CategoryPerf:
+        return cls(
+            category=data.get("category", ""),
+            volume_usdc=data.get("volumeUsdc", "0"),
+            fees_earned_usdc=data.get("feesEarnedUsdc", "0"),
+            markets=data.get("markets", 0),
+            trades=data.get("trades", 0),
+        )
 
 
 @dataclass
 class MarketPerf:
     market_addr: str = ""
     title: str = ""
-    volume: str = "0"
-    fees: str = "0"
+    volume_usdc: str = "0"
+    fees_earned_usdc: str = "0"
+    trades: int = 0
+
+    @classmethod
+    def from_dict(cls, data: dict) -> MarketPerf:
+        return cls(
+            market_addr=data.get("marketAddr", ""),
+            title=data.get("title", ""),
+            volume_usdc=data.get("volumeUsdc", "0"),
+            fees_earned_usdc=data.get("feesEarnedUsdc", "0"),
+            trades=data.get("trades", 0),
+        )
 
 
 @dataclass
 class PerformanceResponse:
-    success: bool = False
-    fees_earned: str = "0"
-    volume_by_source: Optional[VolumeBySource] = None
+    period: str = ""
+    volume_definition: str = ""
+    creator_stats: Optional[CreatorStats] = None
     by_category: list[CategoryPerf] = field(default_factory=list)
     by_market: list[MarketPerf] = field(default_factory=list)
-    period: str = ""
+    activity: Optional[ActivityStats] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> PerformanceResponse:
         return cls(
-            success=data.get("success", False),
-            fees_earned=data.get("fees_earned", "0"),
-            volume_by_source=_parse(VolumeBySource, data.get("volume_by_source")),
-            by_category=_parse_list(CategoryPerf, data.get("by_category")),
-            by_market=_parse_list(MarketPerf, data.get("by_market")),
             period=data.get("period", ""),
+            volume_definition=data.get("volumeDefinition", ""),
+            creator_stats=CreatorStats.from_dict(data["creatorStats"]) if "creatorStats" in data else None,
+            by_category=[CategoryPerf.from_dict(c) for c in data.get("byCategory", []) if isinstance(c, dict)],
+            by_market=[MarketPerf.from_dict(m) for m in data.get("byMarket", []) if isinstance(m, dict)],
+            activity=ActivityStats.from_dict(data["activity"]) if "activity" in data else None,
         )
 
 
