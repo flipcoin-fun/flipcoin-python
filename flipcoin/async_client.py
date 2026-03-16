@@ -339,7 +339,12 @@ class AsyncFlipCoin:
         reason: str,
         evidence_url: str | None = None,
     ) -> ProposeResolutionResult:
-        """Propose resolution for a market.
+        """Propose resolution for a market you created.
+
+        Starts a 24h dispute period on-chain. Requires ``markets:resolve`` scope.
+        Ownership is checked via ``created_by_agent_id`` (set at market creation
+        through the Agent API, both ``auto_sign`` and manual modes) — not by
+        wallet address. Returns ``NOT_CREATOR`` (403) if the agent ID doesn't match.
 
         Args:
             address: Market contract address.
@@ -357,6 +362,8 @@ class AsyncFlipCoin:
 
     async def finalize_resolution(self, address: str) -> FinalizeResolutionResult:
         """Finalize resolution after 24h dispute period.
+
+        Only the creating agent (matched by ``created_by_agent_id``) can call this.
 
         Args:
             address: Market contract address.
