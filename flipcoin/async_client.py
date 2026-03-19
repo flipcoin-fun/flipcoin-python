@@ -310,16 +310,11 @@ class AsyncFlipCoin:
             image_url=image_url,
             metadata=metadata,
         )
-        params: dict[str, str] = {}
         if auto_sign:
-            params["auto_sign"] = "true"
+            body["auto_sign"] = True
         if dry_run:
-            params["dry_run"] = "true"
-        path = "/api/agent/markets"
-        if params:
-            qs = "&".join(f"{k}={v}" for k, v in params.items())
-            path = f"{path}?{qs}"
-        data = await self._post(path, json_body=body)
+            body["dry_run"] = True
+        data = await self._post("/api/agent/markets", json_body=body)
         return _parse(CreateMarketResult, data)
 
     async def batch_create_markets(self, markets: list[dict]) -> BatchResult:
@@ -551,7 +546,13 @@ class AsyncFlipCoin:
         return _parse(OrderCancelResponse, data) or OrderCancelResponse()
 
     async def cancel_all_orders(self) -> OrderCancelResponse:
-        data = await self._delete("/api/agent/orders/_all", params={"cancelAll": "true"})
+        """Cancel all open orders (DB-level mass cancel).
+
+        Uses a placeholder orderHash in the path (server requires valid
+        bytes32 format) with ``cancelAll=true`` query param.
+        """
+        _ZERO_HASH = "0x" + "0" * 64
+        data = await self._delete(f"/api/agent/orders/{_ZERO_HASH}", params={"cancelAll": "true"})
         return _parse(OrderCancelResponse, data) or OrderCancelResponse()
 
     # -----------------------------------------------------------------------
@@ -713,6 +714,7 @@ class AsyncFlipCoin:
         *,
         amount: str | None = None,
         target_balance: str | None = None,
+        destination: str | None = None,
         signed_transaction: str | None = None,
         intent_id: str | None = None,
     ) -> WithdrawResult:
@@ -727,6 +729,14 @@ class AsyncFlipCoin:
         ``signed_transaction``.
 
         Unlike deposits, auto-sign is NOT supported — owner must sign.
+
+        Args:
+            amount: USDC amount in base units (6 decimals).
+            target_balance: Target vault balance (auto-computes withdrawal amount).
+            destination: Optional recipient address. Defaults to owner wallet.
+                Currently only the owner address is accepted (Phase 1).
+            signed_transaction: Signed raw transaction hex (relay mode).
+            intent_id: Intent ID from a previous intent call (relay mode).
         """
         if intent_id and signed_transaction:
             body: dict[str, Any] = {
@@ -742,6 +752,8 @@ class AsyncFlipCoin:
             body["amount"] = str(amount)
         if target_balance is not None:
             body["targetBalance"] = str(target_balance)
+        if destination is not None:
+            body["destination"] = destination
         data = await self._post_raw("/api/agent/vault/withdraw", json_body=body)
         return _parse(WithdrawResult, data)
 
