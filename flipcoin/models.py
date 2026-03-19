@@ -1031,12 +1031,12 @@ class CreatorStats:
     @classmethod
     def from_dict(cls, data: dict) -> CreatorStats:
         return cls(
-            markets_created=data.get("marketsCreated", 0),
-            markets_resolved=data.get("marketsResolved", 0),
-            total_volume_usdc=data.get("totalVolumeUsdc", "0"),
-            avg_volume_per_market=data.get("avgVolumePerMarket", "0"),
-            creator_fees_earned_usdc=data.get("creatorFeesEarnedUsdc", "0"),
-            volume_by_source=VolumeBySource.from_dict(data["volumeBySource"]) if "volumeBySource" in data else None,
+            markets_created=data.get("markets_created", 0),
+            markets_resolved=data.get("markets_resolved", 0),
+            total_volume_usdc=data.get("total_volume_usdc", "0"),
+            avg_volume_per_market=data.get("avg_volume_per_market", "0"),
+            creator_fees_earned_usdc=data.get("creator_fees_earned_usdc", "0"),
+            volume_by_source=VolumeBySource.from_dict(data["volume_by_source"]) if "volume_by_source" in data else None,
         )
 
 
@@ -1049,9 +1049,9 @@ class ActivityStats:
     @classmethod
     def from_dict(cls, data: dict) -> ActivityStats:
         return cls(
-            total_trades=data.get("totalTrades", 0),
-            avg_trade_size_usdc=data.get("avgTradeSizeUsdc", "0"),
-            total_fees_usdc=data.get("totalFeesUsdc", "0"),
+            total_trades=data.get("total_trades", 0),
+            avg_trade_size_usdc=data.get("avg_trade_size_usdc", "0"),
+            total_fees_usdc=data.get("total_fees_usdc", "0"),
         )
 
 
@@ -1067,8 +1067,8 @@ class CategoryPerf:
     def from_dict(cls, data: dict) -> CategoryPerf:
         return cls(
             category=data.get("category", ""),
-            volume_usdc=data.get("volumeUsdc", "0"),
-            fees_earned_usdc=data.get("feesEarnedUsdc", "0"),
+            volume_usdc=data.get("volume_usdc", "0"),
+            fees_earned_usdc=data.get("fees_earned_usdc", "0"),
             markets=data.get("markets", 0),
             trades=data.get("trades", 0),
         )
@@ -1085,10 +1085,10 @@ class MarketPerf:
     @classmethod
     def from_dict(cls, data: dict) -> MarketPerf:
         return cls(
-            market_addr=data.get("marketAddr", ""),
+            market_addr=data.get("market_addr", ""),
             title=data.get("title", ""),
-            volume_usdc=data.get("volumeUsdc", "0"),
-            fees_earned_usdc=data.get("feesEarnedUsdc", "0"),
+            volume_usdc=data.get("volume_usdc", "0"),
+            fees_earned_usdc=data.get("fees_earned_usdc", "0"),
             trades=data.get("trades", 0),
         )
 
@@ -1106,10 +1106,10 @@ class PerformanceResponse:
     def from_dict(cls, data: dict) -> PerformanceResponse:
         return cls(
             period=data.get("period", ""),
-            volume_definition=data.get("volumeDefinition", ""),
-            creator_stats=CreatorStats.from_dict(data["creatorStats"]) if "creatorStats" in data else None,
-            by_category=[CategoryPerf.from_dict(c) for c in data.get("byCategory", []) if isinstance(c, dict)],
-            by_market=[MarketPerf.from_dict(m) for m in data.get("byMarket", []) if isinstance(m, dict)],
+            volume_definition=data.get("volume_definition", ""),
+            creator_stats=CreatorStats.from_dict(data["creator_stats"]) if "creator_stats" in data else None,
+            by_category=[CategoryPerf.from_dict(c) for c in data.get("by_category", []) if isinstance(c, dict)],
+            by_market=[MarketPerf.from_dict(m) for m in data.get("by_market", []) if isinstance(m, dict)],
             activity=ActivityStats.from_dict(data["activity"]) if "activity" in data else None,
         )
 
