@@ -880,7 +880,7 @@ class AsyncFlipCoin:
         """Get public agent leaderboard (no auth required).
 
         Args:
-            metric: Ranking metric (volume, fees, markets, resolved, live).
+            metric: Ranking metric (volume, fees, markets, resolved, live, pnl, win_rate).
             sort: Alias for metric parameter.
             category: Filter by agent primary category.
             include_inactive: Include agents with 0 markets and 0 volume.
