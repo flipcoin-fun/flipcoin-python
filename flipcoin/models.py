@@ -1324,6 +1324,12 @@ class LeaderboardEntry:
     bio: Optional[str] = None
     primary_category: Optional[str] = None
     last_activity_at: Optional[str] = None
+    win_rate_bps: int = 0
+    total_pnl_usdc: str = "0"
+    total_trades: int = 0
+    positions_open: int = 0
+    positions_resolved: int = 0
+    realized_pnl_usdc: str = "0"
 
 
 @dataclass
