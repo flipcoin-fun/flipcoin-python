@@ -594,6 +594,12 @@ class LmsrInfo:
     b: str = ""
     price_yes_bps: int = 0
     price_no_bps: int = 0
+    b_raw: str = ""
+    q_yes_raw: str = ""
+    q_no_raw: str = ""
+    fee_bps: int = 0
+    yes_shares_total: str = ""
+    no_shares_total: str = ""
 
 
 @dataclass
@@ -605,9 +611,31 @@ class MarketAnalytics:
 
 @dataclass
 class SlippageCurveEntry:
-    amount_usdc: str = ""
+    amount_usdc: int = 0
+    baseline_price_yes_bps: int = 0
+    post_trade_price_yes_bps: int = 0
     price_impact_bps: int = 0
+    avg_fill_price_ex_fee_bps: int = 0
+    avg_fill_price_incl_fee_bps: int = 0
+    shares_out: str = ""
+    # Backward compat alias (old field name)
     effective_price_bps: int = 0
+
+
+@dataclass
+class SlippageCurves:
+    """Nested slippage curve structure with buy_yes and buy_no arrays."""
+    buy_yes: list[SlippageCurveEntry] = field(default_factory=list)
+    buy_no: list[SlippageCurveEntry] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict | None) -> Optional[SlippageCurves]:
+        if not data:
+            return None
+        return cls(
+            buy_yes=_parse_list(SlippageCurveEntry, data.get("buy_yes")),
+            buy_no=_parse_list(SlippageCurveEntry, data.get("buy_no")),
+        )
 
 
 @dataclass
@@ -617,17 +645,30 @@ class MarketState:
     condition_id: str = ""
     lmsr: Optional[LmsrInfo] = None
     analytics: Optional[MarketAnalytics] = None
-    slippage_curve: list[SlippageCurveEntry] = field(default_factory=list)
+    slippage_curve: Optional[SlippageCurves] = None
+    schema_version: str = ""
+    units: Optional[dict] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> MarketState:
+        # Parse slippage_curve: handle both nested object and flat list
+        raw_curve = data.get("slippage_curve")
+        slippage: Optional[SlippageCurves] = None
+        if isinstance(raw_curve, dict):
+            slippage = SlippageCurves.from_dict(raw_curve)
+        elif isinstance(raw_curve, list):
+            # Backward compat: flat list → put into buy_yes
+            slippage = SlippageCurves(buy_yes=_parse_list(SlippageCurveEntry, raw_curve))
+
         return cls(
             success=data.get("success", False),
             market=data.get("market", ""),
             condition_id=data.get("condition_id", ""),
-            lmsr=_parse(LmsrInfo, data.get("lmsr")),
+            lmsr=_parse(LmsrInfo, data.get("lmsr_state")),
             analytics=_parse(MarketAnalytics, data.get("analytics")),
-            slippage_curve=_parse_list(SlippageCurveEntry, data.get("slippage_curve")),
+            slippage_curve=slippage,
+            schema_version=data.get("schema_version", ""),
+            units=data.get("units"),
         )
 
 

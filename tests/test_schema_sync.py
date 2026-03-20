@@ -64,6 +64,16 @@ ENDPOINT_METHOD_MAP: dict[tuple[str, str], str] = {
     ("GET", "/api/agent/comments"): "get_comments",
     ("POST", "/api/agent/comments/{commentId}/like"): "like_comment",
     ("DELETE", "/api/agent/comments/{commentId}/like"): "unlike_comment",
+    # Resolution
+    ("POST", "/api/agent/markets/{address}/propose-resolution"): "propose_resolution",
+    ("POST", "/api/agent/markets/{address}/finalize-resolution"): "finalize_resolution",
+    # Trade history
+    ("GET", "/api/agent/trade/history"): "get_trade_history",
+    # Vault withdraw
+    ("GET", "/api/agent/vault/withdraw"): "get_withdraw_info",
+    ("POST", "/api/agent/vault/withdraw"): "withdraw",
+    # Portfolio redeem
+    ("POST", "/api/agent/portfolio/redeem"): "redeem_positions",
 }
 
 # Endpoints in OpenAPI that the Python SDK does NOT yet cover.
@@ -71,18 +81,8 @@ ENDPOINT_METHOD_MAP: dict[tuple[str, str], str] = {
 # If this set grows unexpectedly, it means new endpoints were added to the spec
 # without updating the SDK.
 KNOWN_SDK_GAPS: set[tuple[str, str]] = {
-    # Resolution (not yet in Python SDK)
-    ("POST", "/api/agent/markets/{address}/propose-resolution"),
-    ("POST", "/api/agent/markets/{address}/finalize-resolution"),
     # Relay (Mode A manual market creation)
     ("POST", "/api/agent/relay"),
-    # Trade history
-    ("GET", "/api/agent/trade/history"),
-    # Vault withdraw
-    ("GET", "/api/agent/vault/withdraw"),
-    ("POST", "/api/agent/vault/withdraw"),
-    # Portfolio redeem
-    ("POST", "/api/agent/portfolio/redeem"),
     # Activity
     ("GET", "/api/agent/activity"),
     ("POST", "/api/agent/activity/{id}/relay-signed"),
@@ -242,9 +242,7 @@ class TestResponseModelFields:
         missing = expected_snake - model_fields
 
         # Known field gaps in the Python SDK (real drift — tracked for future fix)
-        known_field_gaps: dict[str, set[str]] = {
-            "ConfigResponse": {"fees"},  # fees field added to spec, not yet in SDK
-        }
+        known_field_gaps: dict[str, set[str]] = {}
         known = known_field_gaps.get(model_name, set())
         unexpected_missing = missing - known
         assert unexpected_missing == set(), (
