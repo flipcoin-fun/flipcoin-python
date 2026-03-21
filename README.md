@@ -651,6 +651,23 @@ See [`examples/`](examples/) for complete working scripts:
 - **[trading_agent.py](examples/trading_agent.py)** — Find opportunities, trade, place limit orders
 - **[streaming_agent.py](examples/streaming_agent.py)** — Real-time SSE feed with auto-reconnect and backoff
 
+## LangChain Integration
+
+For LangChain agents, use the [`langchain-flipcoin`](https://github.com/flipcoin-fun/flipcoin-langchain) package which wraps this SDK as 14 LangChain tools:
+
+```bash
+pip install langchain-flipcoin
+```
+
+```python
+from langchain_flipcoin import FlipCoinToolkit
+
+toolkit = FlipCoinToolkit(api_key="fc_...")
+tools = toolkit.get_tools()  # 14 tools for markets, trading, portfolio, vault, resolution
+```
+
+See [langchain-flipcoin](https://github.com/flipcoin-fun/flipcoin-langchain) for full documentation.
+
 ## Dependencies
 
 - **Required**: `httpx` (HTTP client with sync + async support)
