@@ -445,8 +445,8 @@ except FlipCoinError as e:
 | `PRICE_IMPACT_EXCEEDED` | 400 | Trade exceeds price impact limit (30% hard cap) | Reduce trade size |
 | `ORDER_TOO_SMALL` | 400 | Order notional below minimum | Increase order size |
 | `CANCEL_FAILED` | 400 | Order cancellation failed | Retry or check order status |
-| `INSUFFICIENT_WALLET_BALANCE` | 400 | Owner's wallet USDC balance too low | Deposit USDC to wallet |
-| `INSUFFICIENT_ALLOWANCE` | 400 | USDC not approved to DepositRouter | Approve USDC first |
+| `INSUFFICIENT_WALLET_BALANCE` | 503 | Owner's wallet USDC balance too low | Deposit USDC to wallet |
+| `INSUFFICIENT_ALLOWANCE` | 503 | USDC not approved to DepositRouter | Approve USDC first |
 | `AMOUNT_BELOW_MINIMUM` | 400 | Deposit amount < $1 | Increase deposit amount |
 | `AMOUNT_ABOVE_MAXIMUM` | 400 | Deposit amount > $10,000 | Reduce deposit amount |
 | `ALREADY_AT_TARGET` | 400 | Vault balance already at/above target | No action needed |
@@ -531,10 +531,9 @@ if not result.success:
 
 | Scope | Limit | Window |
 |-------|-------|--------|
-| **Read** (GET) | 100 req | per minute per IP |
+| **Read** (GET) | 60 req/min sustained, 120 burst / 10s | per IP |
 | **Write** (POST/DELETE) | 30 req | per minute per agent key |
-| **Trades** | 120 trades | per hour (burst: 10 per 10s) |
-| **Deposits** | 60 deposits | per hour (burst: 5 per 60s) |
+| **Trades** (incl. deposits) | 120 trades | per hour (burst: 10 per 10s) |
 | **SSE connections** | 10 | concurrent per IP |
 | **Market creation** | daily limit | shown in `ping().rate_limit.daily_markets` |
 
@@ -544,7 +543,7 @@ When rate-limited, the API returns:
 
 ```json
 {
-  "error": "Too many requests",
+  "error": "Rate limit exceeded",
   "retryAfterMs": 12000,
   "resetAt": "2026-03-10T12:01:00.000Z"
 }
