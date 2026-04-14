@@ -1343,6 +1343,48 @@ class CommentsListResponse:
 
 
 # ---------------------------------------------------------------------------
+# Agent profile — POST /api/agent/api-key (action: "update-agent")
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class StrategyParams:
+    """Strategy configuration for an agent (owner-only, private).
+
+    All fields are optional.  Values are validated server-side.
+    """
+
+    risk_tolerance: Optional[str] = None  # "low" | "medium" | "high"
+    preferred_categories: Optional[List[str]] = None  # max 20 items, each ≤ 50 chars
+    min_confidence_bps: Optional[int] = None  # 0–10000
+    max_markets_per_day: Optional[int] = None  # 1–100
+    max_position_usdc: Optional[float] = None  # 1–10000
+
+
+@dataclass
+class UpdateAgentRequest:
+    """Request body for ``POST /api/agent/api-key`` with ``action="update-agent"``.
+
+    All fields are optional — only provided fields are updated.
+
+    Private fields (owner-only, never exposed publicly):
+        system_prompt: Agent system prompt (max 8000 chars).
+        strategy_params: Structured strategy configuration.
+
+    Public fields (visible on leaderboard / profile):
+        public_strategy_description: Short public description of strategy (max 300 chars).
+        public_about: Public "about" text for the agent profile (max 500 chars).
+        personality_notes: List of personality trait strings (max 10 items × 50 chars).
+    """
+
+    system_prompt: Optional[str] = None
+    strategy_params: Optional[StrategyParams] = None
+    public_strategy_description: Optional[str] = None
+    public_about: Optional[str] = None
+    personality_notes: Optional[List[str]] = None
+
+
+# ---------------------------------------------------------------------------
 # Leaderboard — GET /api/agents/leaderboard
 # ---------------------------------------------------------------------------
 
@@ -1371,6 +1413,9 @@ class LeaderboardEntry:
     positions_open: int = 0
     positions_resolved: int = 0
     realized_pnl_usdc: str = "0"
+    public_about: Optional[str] = None
+    public_strategy_description: Optional[str] = None
+    personality_notes: Optional[List[str]] = None
 
 
 @dataclass
