@@ -67,6 +67,8 @@ ENDPOINT_METHOD_MAP: dict[tuple[str, str], str] = {
     # Resolution
     ("POST", "/api/agent/markets/{address}/propose-resolution"): "propose_resolution",
     ("POST", "/api/agent/markets/{address}/finalize-resolution"): "finalize_resolution",
+    # Agent profile management
+    ("POST", "/api/agent/api-key"): "update_agent",
     # Trade history
     ("GET", "/api/agent/trade/history"): "get_trade_history",
     # Vault withdraw
@@ -88,8 +90,7 @@ KNOWN_SDK_GAPS: set[tuple[str, str]] = {
     ("POST", "/api/agent/activity/{id}/relay-signed"),
     # Stats
     ("GET", "/api/agent/stats"),
-    # API key management
-    ("POST", "/api/agent/api-key"),
+    # API key management — POST (update-agent) is now covered by update_agent()
     ("GET", "/api/agent/api-key"),
     # Session key management
     ("GET", "/api/agent/session-key"),
@@ -354,3 +355,127 @@ class TestMethodSignatures:
             assert expected in params, (
                 f"create_market() missing param '{expected}', has: {params}"
             )
+
+    def test_update_agent_has_all_new_params(self):
+        sig = inspect.signature(FlipCoin.update_agent)
+        params = set(sig.parameters.keys()) - {"self"}
+        for expected in (
+            "system_prompt",
+            "strategy_params",
+            "public_strategy_description",
+            "public_about",
+            "personality_notes",
+        ):
+            assert expected in params, (
+                f"update_agent() missing param '{expected}', has: {params}"
+            )
+
+
+# ─── New models: StrategyParams, UpdateAgentRequest, LeaderboardEntry fields ──
+
+
+class TestStrategyParams:
+    """StrategyParams dataclass exists with the correct fields."""
+
+    def test_strategy_params_is_dataclass(self):
+        assert dataclasses.is_dataclass(models.StrategyParams)
+
+    def test_strategy_params_fields(self):
+        fields = {f.name for f in dataclasses.fields(models.StrategyParams)}
+        for expected in (
+            "risk_tolerance",
+            "preferred_categories",
+            "min_confidence_bps",
+            "max_markets_per_day",
+            "max_position_usdc",
+        ):
+            assert expected in fields, (
+                f"StrategyParams missing field '{expected}', has: {fields}"
+            )
+
+    def test_strategy_params_all_optional(self):
+        """All fields should default to None (fully optional)."""
+        sp = models.StrategyParams()
+        assert sp.risk_tolerance is None
+        assert sp.preferred_categories is None
+        assert sp.min_confidence_bps is None
+        assert sp.max_markets_per_day is None
+        assert sp.max_position_usdc is None
+
+    def test_strategy_params_construction(self):
+        sp = models.StrategyParams(
+            risk_tolerance="medium",
+            preferred_categories=["crypto", "sports"],
+            min_confidence_bps=6000,
+            max_markets_per_day=5,
+            max_position_usdc=500.0,
+        )
+        assert sp.risk_tolerance == "medium"
+        assert sp.preferred_categories == ["crypto", "sports"]
+        assert sp.min_confidence_bps == 6000
+        assert sp.max_markets_per_day == 5
+        assert sp.max_position_usdc == 500.0
+
+
+class TestUpdateAgentRequest:
+    """UpdateAgentRequest dataclass exists with all 5 new fields."""
+
+    def test_update_agent_request_is_dataclass(self):
+        assert dataclasses.is_dataclass(models.UpdateAgentRequest)
+
+    def test_update_agent_request_fields(self):
+        fields = {f.name for f in dataclasses.fields(models.UpdateAgentRequest)}
+        for expected in (
+            "system_prompt",
+            "strategy_params",
+            "public_strategy_description",
+            "public_about",
+            "personality_notes",
+        ):
+            assert expected in fields, (
+                f"UpdateAgentRequest missing field '{expected}', has: {fields}"
+            )
+
+    def test_update_agent_request_all_optional(self):
+        """All fields should default to None."""
+        req = models.UpdateAgentRequest()
+        assert req.system_prompt is None
+        assert req.strategy_params is None
+        assert req.public_strategy_description is None
+        assert req.public_about is None
+        assert req.personality_notes is None
+
+    def test_update_agent_request_strategy_params_typed(self):
+        sp = models.StrategyParams(risk_tolerance="low")
+        req = models.UpdateAgentRequest(strategy_params=sp)
+        assert req.strategy_params is sp
+        assert req.strategy_params.risk_tolerance == "low"
+
+
+class TestLeaderboardEntryNewFields:
+    """LeaderboardEntry has the 3 new public profile fields."""
+
+    def test_leaderboard_entry_has_public_about(self):
+        entry = models.LeaderboardEntry()
+        assert hasattr(entry, "public_about")
+        assert entry.public_about is None
+
+    def test_leaderboard_entry_has_public_strategy_description(self):
+        entry = models.LeaderboardEntry()
+        assert hasattr(entry, "public_strategy_description")
+        assert entry.public_strategy_description is None
+
+    def test_leaderboard_entry_has_personality_notes(self):
+        entry = models.LeaderboardEntry()
+        assert hasattr(entry, "personality_notes")
+        assert entry.personality_notes is None
+
+    def test_leaderboard_entry_new_fields_populated(self):
+        entry = models.LeaderboardEntry(
+            public_about="I trade crypto markets.",
+            public_strategy_description="Momentum-based YES bias.",
+            personality_notes=["analytical", "patient"],
+        )
+        assert entry.public_about == "I trade crypto markets."
+        assert entry.public_strategy_description == "Momentum-based YES bias."
+        assert entry.personality_notes == ["analytical", "patient"]

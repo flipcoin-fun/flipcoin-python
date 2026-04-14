@@ -40,9 +40,11 @@ from .models import (
     RedeemBatchResponse,
     RedeemPosition,
     SSEEvent,
+    StrategyParams,
     TradeHistoryResponse,
     TradeNonceResponse,
     TradeResult,
+    UpdateAgentRequest,
     ValidateResult,
     VaultBalanceResponse,
     Webhook,
@@ -902,3 +904,63 @@ class AsyncFlipCoin:
             params["offset"] = offset
         data = await self._get("/api/agents/leaderboard", params=params)
         return LeaderboardResponse.from_dict(data)
+
+    # -----------------------------------------------------------------------
+    # Agent profile management
+    # -----------------------------------------------------------------------
+
+    async def update_agent(
+        self,
+        *,
+        system_prompt: str | None = None,
+        strategy_params: StrategyParams | None = None,
+        public_strategy_description: str | None = None,
+        public_about: str | None = None,
+        personality_notes: list[str] | None = None,
+    ) -> dict:
+        """Update agent profile fields (``POST /api/agent/api-key`` action="update-agent").
+
+        All fields are optional — only provided fields are updated.
+
+        Private fields (owner-only, never exposed publicly):
+            system_prompt: Agent system prompt (max 8000 chars).
+            strategy_params: Structured strategy configuration.
+
+        Public fields (visible on leaderboard / profile):
+            public_strategy_description: Short public description of strategy (max 300 chars).
+            public_about: Public "about" text for the agent profile (max 500 chars).
+            personality_notes: List of personality trait strings (max 10 items × 50 chars).
+
+        Args:
+            system_prompt: Private system prompt for the agent (max 8000 chars).
+            strategy_params: :class:`StrategyParams` instance with strategy config.
+            public_strategy_description: Public strategy description (max 300 chars).
+            public_about: Public about text (max 500 chars).
+            personality_notes: List of personality trait strings (max 10 × 50 chars).
+
+        Returns:
+            Raw response dict from the API.
+        """
+        body: dict[str, Any] = {"action": "update-agent"}
+        if system_prompt is not None:
+            body["systemPrompt"] = system_prompt
+        if strategy_params is not None:
+            sp: dict[str, Any] = {}
+            if strategy_params.risk_tolerance is not None:
+                sp["riskTolerance"] = strategy_params.risk_tolerance
+            if strategy_params.preferred_categories is not None:
+                sp["preferredCategories"] = strategy_params.preferred_categories
+            if strategy_params.min_confidence_bps is not None:
+                sp["minConfidenceBps"] = strategy_params.min_confidence_bps
+            if strategy_params.max_markets_per_day is not None:
+                sp["maxMarketsPerDay"] = strategy_params.max_markets_per_day
+            if strategy_params.max_position_usdc is not None:
+                sp["maxPositionUsdc"] = strategy_params.max_position_usdc
+            body["strategyParams"] = sp
+        if public_strategy_description is not None:
+            body["publicStrategyDescription"] = public_strategy_description
+        if public_about is not None:
+            body["publicAbout"] = public_about
+        if personality_notes is not None:
+            body["personalityNotes"] = personality_notes
+        return await self._post("/api/agent/api-key", json_body=body)
