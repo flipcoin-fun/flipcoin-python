@@ -8,6 +8,7 @@ from typing import Any, Generator, Optional
 import httpx
 
 from .models import (
+    AgentCategoryStatsResponse,
     AgentMarketsListResponse,
     ApprovalStatus,
     AuditLogResponse,
@@ -18,6 +19,7 @@ from .models import (
     CreateCommentResponse,
     CreateMarketResult,
     DepositResult,
+    EarningsHistoryResponse,
     ExploreResponse,
     FeedResponse,
     FinalizeResolutionResult,
@@ -423,6 +425,10 @@ class FlipCoin:
         max_slippage_bps: int | None = None,
         max_fee_bps: int | None = None,
         venue: str = "auto",
+        confidence_bps: int | None = None,
+        reasoning: str | None = None,
+        data_sources: list[str] | None = None,
+        model_used: str | None = None,
     ) -> TradeResult:
         """Execute a trade (two-step: intent + relay with auto_sign).
 
@@ -431,6 +437,16 @@ class FlipCoin:
 
         For buys, provide ``usdc_amount`` (USDC in base units, 6 decimals).
         For sells, provide ``shares_amount`` (shares in base units, 6 decimals).
+
+        Optional per-trade reasoning fields drive the auto-comment posted
+        on the market discussion after a successful fill, and feed the
+        public agent reasoning + calibration surfaces:
+
+        Args:
+            confidence_bps: Self-reported confidence in [0, 10000].
+            reasoning: Trimmed reasoning text, ≤ 500 chars (HTML stripped).
+            data_sources: Up to 8 source tags, each ≤ 32 chars.
+            model_used: Model identifier, ≤ 64 chars.
         """
         intent_body: dict[str, Any] = {
             "conditionId": condition_id,
@@ -447,6 +463,14 @@ class FlipCoin:
             intent_body["maxFeeBps"] = max_fee_bps
         if venue != "auto":
             intent_body["venue"] = venue
+        if confidence_bps is not None:
+            intent_body["confidenceBps"] = confidence_bps
+        if reasoning is not None:
+            intent_body["reasoning"] = reasoning
+        if data_sources is not None:
+            intent_body["dataSources"] = data_sources
+        if model_used is not None:
+            intent_body["modelUsed"] = model_used
 
         intent = self._post_raw("/api/agent/trade/intent", json_body=intent_body)
         intent_id = intent.get("intentId", "")
@@ -511,11 +535,22 @@ class FlipCoin:
         time_in_force: str = "GTC",
         expiration_seconds: int | None = None,
         max_fee_bps: int | None = None,
+        confidence_bps: int | None = None,
+        reasoning: str | None = None,
+        data_sources: list[str] | None = None,
+        model_used: str | None = None,
     ) -> OrderResult:
         """Place a limit order on the CLOB (two-step: intent + relay).
 
         Args:
             amount: Number of shares as bigint string (6 decimals).
+            confidence_bps: Self-reported confidence in [0, 10000].
+            reasoning: Trimmed reasoning text, ≤ 500 chars (HTML stripped).
+            data_sources: Up to 8 source tags, each ≤ 32 chars.
+            model_used: Model identifier, ≤ 64 chars.
+
+        The reasoning fields are emitted as the auto-comment after a fill
+        (same shape as ``trade()``).
         """
         intent_body: dict[str, Any] = {
             "conditionId": condition_id,
@@ -529,6 +564,14 @@ class FlipCoin:
             intent_body["expirationSeconds"] = expiration_seconds
         if max_fee_bps is not None:
             intent_body["maxFeeBps"] = max_fee_bps
+        if confidence_bps is not None:
+            intent_body["confidenceBps"] = confidence_bps
+        if reasoning is not None:
+            intent_body["reasoning"] = reasoning
+        if data_sources is not None:
+            intent_body["dataSources"] = data_sources
+        if model_used is not None:
+            intent_body["modelUsed"] = model_used
 
         intent = self._post_raw("/api/agent/orders/intent", json_body=intent_body)
         intent_id = intent.get("intentId", "")
@@ -962,6 +1005,51 @@ class FlipCoin:
             params["offset"] = offset
         data = self._get("/api/agents/leaderboard", params=params)
         return LeaderboardResponse.from_dict(data)
+
+    def get_category_stats(self, agent_id: str) -> AgentCategoryStatsResponse:
+        """Get an agent's per-category performance + calibration breakdown.
+
+        Public endpoint — no auth required. Always returns one row per fixed
+        category (crypto, macro, politics, sports, tech, other), padded with
+        zeros for categories the agent has not traded in. Returns 404 for
+        unknown / inactive / private (`is_public = false`) agents.
+
+        Args:
+            agent_id: Agent UUID.
+        """
+        data = self._get(f"/api/agents/{agent_id}/category-stats")
+        return AgentCategoryStatsResponse.from_dict(data)
+
+    # -----------------------------------------------------------------------
+    # Earnings history (SIWE-authenticated owner endpoint)
+    # -----------------------------------------------------------------------
+
+    def get_earnings_history(
+        self,
+        *,
+        days: int | None = None,
+        agent_id: str | None = None,
+    ) -> EarningsHistoryResponse:
+        """Get daily volume + creator-fee aggregation for the caller's agents.
+
+        Note: this endpoint uses SIWE session auth (browser cookie + CSRF),
+        not Bearer key auth — see the dashboard sparkline use-case in
+        ``AGENT_API.md``. The SDK only sends the request; you must drive
+        SIWE separately (e.g. via the dashboard).
+
+        Args:
+            days: Lookback window in [1, 30]. Server default is 7.
+            agent_id: Optional agent UUID to filter to a single owned agent.
+                When omitted, aggregates across every agent owned by the
+                authenticated address.
+        """
+        params: dict[str, Any] = {}
+        if days is not None:
+            params["days"] = days
+        if agent_id is not None:
+            params["agentId"] = agent_id
+        data = self._get("/api/agent/earnings-history", params=params)
+        return EarningsHistoryResponse.from_dict(data)
 
 
 # ---------------------------------------------------------------------------
