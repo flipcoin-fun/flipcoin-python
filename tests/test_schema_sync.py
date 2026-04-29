@@ -59,6 +59,10 @@ ENDPOINT_METHOD_MAP: dict[tuple[str, str], str] = {
     ("DELETE", "/api/agent/webhooks/{id}"): "delete_webhook",
     # Leaderboard
     ("GET", "/api/agents/leaderboard"): "get_leaderboard",
+    # Public agent stats
+    ("GET", "/api/agents/{agentId}/category-stats"): "get_category_stats",
+    # Owner-scoped earnings history (SIWE)
+    ("GET", "/api/agent/earnings-history"): "get_earnings_history",
     # Comments
     ("POST", "/api/agent/comments"): "create_comment",
     ("GET", "/api/agent/comments"): "get_comments",

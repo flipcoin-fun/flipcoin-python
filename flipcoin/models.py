@@ -1533,3 +1533,109 @@ class FinalizeResolutionResult:
     tx_hash: str = ""
     outcome: str = ""
     payout_per_share: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Earnings history — GET /api/agent/earnings-history
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class DailyEarningsPoint:
+    date: str = ""
+    volume_usdc: float = 0.0
+    creator_fees_usdc: float = 0.0
+
+
+@dataclass
+class EarningsTotals:
+    volume_usdc: float = 0.0
+    creator_fees_usdc: float = 0.0
+
+
+@dataclass
+class EarningsHistoryResponse:
+    days: int = 7
+    agent_id: Optional[str] = None
+    daily: list[DailyEarningsPoint] = field(default_factory=list)
+    totals: EarningsTotals = field(default_factory=EarningsTotals)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> EarningsHistoryResponse:
+        return cls(
+            days=int(data.get("days", 7)),
+            agent_id=data.get("agentId"),
+            daily=[
+                DailyEarningsPoint(
+                    date=str(item.get("date", "")),
+                    volume_usdc=float(item.get("volumeUsdc", 0) or 0),
+                    creator_fees_usdc=float(item.get("creatorFeesUsdc", 0) or 0),
+                )
+                for item in (data.get("daily") or [])
+                if isinstance(item, dict)
+            ],
+            totals=EarningsTotals(
+                volume_usdc=float((data.get("totals") or {}).get("volumeUsdc", 0) or 0),
+                creator_fees_usdc=float(
+                    (data.get("totals") or {}).get("creatorFeesUsdc", 0) or 0
+                ),
+            ),
+        )
+
+
+# ---------------------------------------------------------------------------
+# Per-category stats — GET /api/agents/{agentId}/category-stats
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class AgentCategoryStatsEntry:
+    category: str = ""
+    wins: int = 0
+    losses: int = 0
+    volume_usdc: str = "0"
+    realized_pnl_usdc: str = "0"
+    avg_confidence_bps: Optional[int] = None
+    calibration_score: Optional[float] = None
+    trades_with_confidence: int = 0
+
+
+@dataclass
+class AgentCategoryStatsResponse:
+    agent_id: str = ""
+    overall_calibration: Optional[float] = None
+    categories: list[AgentCategoryStatsEntry] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> AgentCategoryStatsResponse:
+        rows = data.get("categories") or []
+        return cls(
+            agent_id=str(data.get("agentId", "")),
+            overall_calibration=(
+                float(data["overallCalibration"])
+                if data.get("overallCalibration") is not None
+                else None
+            ),
+            categories=[
+                AgentCategoryStatsEntry(
+                    category=str(row.get("category", "")),
+                    wins=int(row.get("wins", 0) or 0),
+                    losses=int(row.get("losses", 0) or 0),
+                    volume_usdc=str(row.get("volumeUsdc", "0")),
+                    realized_pnl_usdc=str(row.get("realizedPnlUsdc", "0")),
+                    avg_confidence_bps=(
+                        int(row["avgConfidenceBps"])
+                        if row.get("avgConfidenceBps") is not None
+                        else None
+                    ),
+                    calibration_score=(
+                        float(row["calibrationScore"])
+                        if row.get("calibrationScore") is not None
+                        else None
+                    ),
+                    trades_with_confidence=int(row.get("tradesWithConfidence", 0) or 0),
+                )
+                for row in rows
+                if isinstance(row, dict)
+            ],
+        )
