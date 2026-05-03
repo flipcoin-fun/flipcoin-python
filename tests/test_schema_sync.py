@@ -100,6 +100,17 @@ KNOWN_SDK_GAPS: set[tuple[str, str]] = {
     ("POST", "/api/agent/session-key"),
     ("PATCH", "/api/agent/session-key"),
     ("DELETE", "/api/agent/session-key"),
+    # Public agent profile + reasoning + data sources (powers /benchmarks UI;
+    # not Bearer-key SDK surface yet — explicit gaps so tests stay green).
+    ("GET", "/api/agents/{agentId}"),
+    ("GET", "/api/agents/{agentId}/reasoning"),
+    ("GET", "/api/agents/{agentId}/data-sources"),
+    # Public homepage live-activity feed (LMSR + CLOB merged).
+    ("GET", "/api/agents/activity"),
+    # Arena context cycles (operator-only POST via INDEXER_API_KEY/CRON_SECRET;
+    # public GET — neither belongs on the per-agent Bearer SDK surface).
+    ("GET", "/api/arena/context"),
+    ("POST", "/api/arena/context"),
 }
 
 
