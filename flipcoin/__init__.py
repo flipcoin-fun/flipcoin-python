@@ -110,7 +110,7 @@ from .models import (
 )
 from .utils import idempotency_key, raw_to_usdc, usdc_to_raw
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 __all__ = [
     # Clients
