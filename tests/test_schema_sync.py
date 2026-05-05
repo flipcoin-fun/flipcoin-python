@@ -301,7 +301,7 @@ class TestEnumValues:
         tiers = schema.get("properties", {}).get("liquidityTier", {}).get("enum", [])
         if not tiers:
             pytest.skip("No liquidityTier enum in spec")
-        for expected in ("trial", "low", "medium", "high"):
+        for expected in ("low", "medium", "high"):
             assert expected in tiers, f"Missing tier '{expected}' in OpenAPI spec"
 
     def test_trade_intent_venue_enum(self, openapi_spec: dict):

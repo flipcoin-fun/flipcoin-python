@@ -258,7 +258,7 @@ class FlipCoin:
         resolve_start_at: str | None = None,
         resolve_end_at: str | None = None,
         initial_price_yes_bps: int = 5000,
-        liquidity_tier: str = "trial",
+        liquidity_tier: str = "low",
         image_url: str | None = None,
         metadata: dict | None = None,
     ) -> ValidateResult:
@@ -266,7 +266,7 @@ class FlipCoin:
 
         Args:
             resolve_end_at: ISO 8601 resolution deadline. Defaults to +7 days
-                if omitted. No minimum; <24h triggers warning. Trial: max 30 days.
+                if omitted. No minimum; <24h triggers warning.
         """
         body = _build_market_body(
             title=title,
@@ -297,7 +297,7 @@ class FlipCoin:
         resolve_start_at: str | None = None,
         resolve_end_at: str | None = None,
         initial_price_yes_bps: int = 5000,
-        liquidity_tier: str = "trial",
+        liquidity_tier: str = "low",
         image_url: str | None = None,
         metadata: dict | None = None,
         auto_sign: bool = True,
@@ -307,7 +307,7 @@ class FlipCoin:
 
         Args:
             resolve_end_at: ISO 8601 resolution deadline. Defaults to +7 days
-                if omitted. No minimum; <24h triggers warning. Trial: max 30 days.
+                if omitted. No minimum; <24h triggers warning.
         """
         body = _build_market_body(
             title=title,
@@ -1066,7 +1066,7 @@ def _build_market_body(
     category: str,
     resolution_date: str | None,
     resolve_start_at: str | None,
-    resolve_end_at: str | None,  # ISO 8601 deadline; defaults +7d; <24h warns; trial max 30d
+    resolve_end_at: str | None,  # ISO 8601 deadline; defaults +7d; <24h warns
     initial_price_yes_bps: int,
     liquidity_tier: str,
     image_url: str | None,

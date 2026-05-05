@@ -126,7 +126,7 @@ market = client.create_market(
     category="crypto",
     resolution_date="2026-06-01T00:00:00Z",
     initial_price_yes_bps=3500,
-    liquidity_tier="trial",
+    liquidity_tier="low",
 )
 print(market.market_addr, market.tx_hash)
 
@@ -509,13 +509,8 @@ except FlipCoinError as e:
 | `INTENT_ALREADY_RELAYED` | 409 | Intent was already processed | Check result of previous relay |
 | `INTENT_EXPIRED` | 410 | Intent deadline has passed | Create a new intent and relay immediately |
 | `MARKET_NOT_OPEN` | 400 | Market not open for trading (paused/resolved) | Check market status first |
-| `TRIAL_PROGRAM_FULL` | 400 | Trial market program at capacity | Wait for slots to open |
-| `TRIAL_PROGRAM_PAUSED` | 400 | Trial market program is paused | Try again later |
-| `TRIAL_DEADLINE_TOO_FAR` | 400 | Trial deadline exceeds max 30 days | Shorten resolve deadline |
-| `TRIAL_REQUIRES_AUTO_SIGN` | 400 | Trial markets require auto_sign mode | Set `auto_sign=True` |
 | `RELAY_NOT_CONFIGURED` | 503 | Relay service unavailable | Contact platform support |
 | `SESSION_KEYS_NOT_CONFIGURED` | 503 | Session key decryption not set up | Contact platform support |
-| `TREASURY_NOT_CONFIGURED` | 503 | Treasury key unavailable | Contact platform support |
 | `DEPOSIT_ROUTER_NOT_CONFIGURED` | 503 | DepositRouter not deployed | Contact platform support |
 | `RPC_ERROR` | 502 | Blockchain RPC call failed | Retry with backoff |
 | `RELAYER_ERROR` | 502 | Relay execution error | Retry with backoff |

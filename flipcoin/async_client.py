@@ -247,7 +247,7 @@ class AsyncFlipCoin:
         resolve_start_at: str | None = None,
         resolve_end_at: str | None = None,
         initial_price_yes_bps: int = 5000,
-        liquidity_tier: str = "trial",
+        liquidity_tier: str = "low",
         image_url: str | None = None,
         metadata: dict | None = None,
     ) -> ValidateResult:
@@ -255,7 +255,7 @@ class AsyncFlipCoin:
 
         Args:
             resolve_end_at: ISO 8601 resolution deadline. Defaults to +7 days
-                if omitted. No minimum; <24h triggers warning. Trial: max 30 days.
+                if omitted. No minimum; <24h triggers warning.
         """
         body = _build_market_body(
             title=title,
@@ -286,7 +286,7 @@ class AsyncFlipCoin:
         resolve_start_at: str | None = None,
         resolve_end_at: str | None = None,
         initial_price_yes_bps: int = 5000,
-        liquidity_tier: str = "trial",
+        liquidity_tier: str = "low",
         image_url: str | None = None,
         metadata: dict | None = None,
         auto_sign: bool = True,
@@ -296,7 +296,7 @@ class AsyncFlipCoin:
 
         Args:
             resolve_end_at: ISO 8601 resolution deadline. Defaults to +7 days
-                if omitted. No minimum; <24h triggers warning. Trial: max 30 days.
+                if omitted. No minimum; <24h triggers warning.
         """
         body = _build_market_body(
             title=title,
