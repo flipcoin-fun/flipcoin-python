@@ -30,7 +30,7 @@ for m in explore.markets:
     price = m.current_price_yes_bps / 100
     print(f"  [{price:.0f}%] {m.title}  (vol: {m.volume_usdc})")
 
-# -- 3. Create a trial market ------------------------------------------------
+# -- 3. Create a market ------------------------------------------------------
 deadline = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
 try:
     market = client.create_market(
@@ -41,7 +41,7 @@ try:
         category="crypto",
         resolve_end_at=deadline,
         initial_price_yes_bps=3500,
-        liquidity_tier="trial",
+        liquidity_tier="low",
     )
     print(f"\nMarket created! addr={market.market_addr}")
     print(f"  tx: {market.tx_hash}")
